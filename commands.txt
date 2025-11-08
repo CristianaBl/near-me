@@ -1,7 +1,17 @@
-Acess frontend (expo)
+pull de pe github oblogatorie (stanga jos)
 
-open termina, git bash
+frontend (expo)
+
+open terminal -> git bash
 cd frontend 
+
+npm i
 npx expo start 
 
 
+pentru backend:
+open new git bash terminal view 
+cd backend 
+
+npm i 
+npm run dev 
