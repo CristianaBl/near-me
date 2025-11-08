@@ -1,5 +1,7 @@
+daca vrei sa faci un branch nou: git checkout -b <branch name>
+
+pentru a da pull la modificarile de pe github
 git fetch 
-git checkout -b <branch name>
 git pull origin <branch name>
 
 pull de pe github oblogatorie (stanga jos)
