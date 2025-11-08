@@ -1,0 +1,7 @@
+Acess frontend (expo)
+
+open termina, git bash
+cd frontend 
+npx expo start 
+
+
