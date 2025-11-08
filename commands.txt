@@ -1,4 +1,9 @@
+git fetch 
+git checkout -b <branch name>
+git pull origin <branch name>
+
 pull de pe github oblogatorie (stanga jos)
+
 
 frontend (expo)
 
