@@ -5,12 +5,15 @@ require("dotenv").config();
 
 const SECRET = process.env.JWT_SECRET; 
 
-async function register(email, password, type = "user") {
+async function register(data) {
+
+  const {firstName, lastName, email, password, type = "user" } = data;
+  
   const existing = await userService.getUserByEmail(email);
   if (existing) throw new Error("Email already exists");
 
   const hashed = await bcrypt.hash(password, 10);
-  const user = await userService.createUser({ email, password: hashed, type });
+  const user = await userService.createUser({ firstName, lastName, email, password: hashed, type });
   return user;
 }
 

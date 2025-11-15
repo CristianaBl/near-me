@@ -3,8 +3,8 @@ const authService = require("./auth.service");
 
 exports.register = async (req, res) => {
   try {
-    const user = await authService.register(req.body.email, req.body.password);
-    res.json({user: toUserDTO(user)});
+    const user = await authService.register(req.body);
+    res.json({ user: toUserDTO(user) });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

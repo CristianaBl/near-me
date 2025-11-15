@@ -5,12 +5,14 @@ import { registerUser } from '@/services/authService';
 
 export default function Register() {
   const router = useRouter();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleRegister = async () => {
     try {
-      await registerUser(email, password);
+      await registerUser(firstName, lastName, email, password);
       Alert.alert('Success', 'Account created! Please log in.');
       router.replace('/login');
     } catch (err: any) {
@@ -20,6 +22,20 @@ export default function Register() {
 
   return (
     <View style={styles.container}>
+      <TextInput
+        placeholder="First Name"
+        style={styles.input}
+        value={firstName}
+        onChangeText={setFirstName}
+      />
+
+      <TextInput
+        placeholder="Last Name"
+        style={styles.input}
+        value={lastName}
+        onChangeText={setLastName}
+      />
+
       <TextInput
         placeholder="Email"
         style={styles.input}
