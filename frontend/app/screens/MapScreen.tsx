@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import MapComponent from '@/components/MapComponent';
 
-export default function Home() {
-  const locations = [
+const locations = [
     {
       id: '1',
       title: 'Central Park Cluj',
@@ -20,22 +19,17 @@ export default function Home() {
     },
   ];
 
+const MapScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Nearby Locations</Text>
       <MapComponent locations={locations} />
     </View>
   );
-}
+};
+
+export default MapScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff', // light theme
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    padding: 16,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  text: { fontSize: 24 }
 });

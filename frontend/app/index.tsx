@@ -1,20 +1,27 @@
-    import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 
-import LoginScreen from '@/app/pages/auth/login';
-import Home from './pages/home';
+import LoginScreen from '@/app/login';
 
 export default function Index() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem('token');
-      setIsLoggedIn(!!token);
+
+      if (token) {
+        setIsLoggedIn(true);
+        router.replace('/tabs/home');
+      }
+
       setIsLoading(false);
     };
+
     checkAuth();
   }, []);
 
@@ -26,5 +33,5 @@ export default function Index() {
     );
   }
 
-  return isLoggedIn ? <Home /> : <LoginScreen onLoginSuccess={() => setIsLoggedIn(true)} />;
+  return <LoginScreen/>;
 }
