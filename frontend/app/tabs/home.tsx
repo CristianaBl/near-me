@@ -14,6 +14,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { io, Socket } from "socket.io-client";
+import { useRouter } from "expo-router";
 
 import User from "@/models/User";
 import FollowRequest from "@/models/FollowRequest";
@@ -35,6 +36,7 @@ import {
 import { getUserIdFromToken } from "@/utils/jwt";
 
 export default function Home() {
+  const router = useRouter();
   const SCREEN_HEIGHT = Dimensions.get("window").height;
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");
@@ -366,6 +368,9 @@ export default function Home() {
       <TouchableOpacity onPress={() => { setSelectedUser(item); setUserActionModalVisible(true); }}>
         <Text style={styles.userEmail}>{item.email}</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push(`/user/${item.id}`)}>
+        <Text style={styles.profileLink}>Details</Text>
+      </TouchableOpacity>
       <View style={styles.rowEnd}>
         <Text style={styles.statusText}>{getStatusLabel(item.id)}</Text>
         <FancyButton
@@ -482,23 +487,25 @@ export default function Home() {
 
         <View style={{ marginTop: 24 }}>
           <Text style={styles.sectionTitle}>People you follow</Text>
-          {subscriptionsFollowing.length === 0 ? (
-            <View style={styles.emptyPill}>
-              <Text style={styles.emptyText}>No subscriptions yet</Text>
+        {subscriptionsFollowing.length === 0 ? (
+          <View style={styles.emptyPill}>
+            <Text style={styles.emptyText}>No subscriptions yet</Text>
+          </View>
+        ) : (
+          subscriptionsFollowing.map((item) => (
+            <View key={item.id} style={[styles.listRow, styles.listRowActions]}>
+              <TouchableOpacity onPress={() => router.push(`/user/${item.targetId}`)}>
+                <Text style={styles.profileLink}>{getEmailById(item.targetId)}</Text>
+              </TouchableOpacity>
+              <FancyButton
+                title="Unfollow"
+                color="#ff6f61"
+                onPress={() => handleUnfollow(item.targetId)}
+              />
             </View>
-          ) : (
-            subscriptionsFollowing.map((item) => (
-              <View key={item.id} style={[styles.listRow, styles.listRowActions]}>
-                <Text>{getEmailById(item.targetId)}</Text>
-                <FancyButton
-                  title="Unfollow"
-                  color="#ff6f61"
-                  onPress={() => handleUnfollow(item.targetId)}
-                />
-              </View>
-            ))
-          )}
-        </View>
+          ))
+        )}
+      </View>
 
         <View style={{ marginTop: 24 }}>
           <Text style={styles.sectionTitle}>Who can see my location</Text>
@@ -685,6 +692,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
+  profileLink: { color: "#6c5ce7", fontWeight: "700", marginRight: 8 },
   listRowActions: {
     flexDirection: "row",
     justifyContent: "space-between",

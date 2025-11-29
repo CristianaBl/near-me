@@ -1,5 +1,6 @@
 const locationService = require("./location.service");
 const { toLocationDTO, toLocationListDTO } = require("./location.dto");
+const { processArrivalWatches } = require("../arrivalWatches/arrivalWatch.service");
 
 async function upsert(req, res) {
   try {
@@ -9,6 +10,8 @@ async function upsert(req, res) {
       return res.status(400).json({ message: "latitude and longitude are required numbers" });
     }
     const loc = await locationService.upsertLocation(userId, latitude, longitude);
+    const io = req.app.get("io");
+    await processArrivalWatches(userId, latitude, longitude, io);
     res.json({ location: toLocationDTO(loc) });
   } catch (err) {
     res.status(400).json({ message: err.message });
