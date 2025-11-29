@@ -90,7 +90,7 @@ export default function MapComponent({ locations = [], onMapClick }: MapComponen
   const center: [number, number] = [46.7712, 23.6236]; // Cluj
 
   return (
-    <div style={{ width: "100%", height: "100vh" }}>
+    <div style={{ width: "100%", height: "70vh" }}>
       <MapContainer
         center={center}
         zoom={13}

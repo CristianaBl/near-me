@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Platform, Dimensions, Modal, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Platform, Dimensions, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView } from "react-native";
 import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import MapComponent from "@/components/MapComponent";
 import { getUserIdFromToken } from "@/utils/jwt";
 import { getFollowingLocations, updateLocation, UserLocation } from "@/services/locationService";
-import { createPin, getPins, Pin, PinCategory } from "@/services/pinService";
+import { createPin, getPins, deletePin, Pin, PinCategory } from "@/services/pinService";
 
 type Marker = {
   id: string;
@@ -35,6 +35,7 @@ export default function Map() {
   const [myLocation, setMyLocation] = useState<ExpoLocation.LocationObject | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
   const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [pinListVisible, setPinListVisible] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -245,6 +246,34 @@ export default function Map() {
     }
   };
 
+  const handleDeletePin = async (pinId: string) => {
+    const userId = await ensureUserId();
+    if (!userId) return;
+    const confirm = async () => {
+      try {
+        await deletePin(pinId, userId);
+        setPins((prev) => prev.filter((p) => p.id !== pinId));
+        await loadPins();
+      } catch (err: any) {
+        Alert.alert("Error", err.message);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const ok = typeof window !== "undefined" ? window.confirm("Delete pin? This will remove the saved location.") : false;
+      if (ok) await confirm();
+    } else {
+      Alert.alert("Delete pin?", "This will remove the saved location.", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: confirm,
+        },
+      ]);
+    }
+  };
+
   const handleSelectLocation = async (lat: number, lng: number) => {
     const userId = await ensureUserId();
     if (!userId) {
@@ -272,7 +301,12 @@ export default function Map() {
   }
 
   return (
-    <View style={[styles.container, { height: SCREEN_HEIGHT * 0.9, paddingBottom: 40 }]}>
+    <SafeAreaView style={[styles.container]}>
+      <View style={[styles.topBar, { paddingTop: 50 }]}>
+        <TouchableOpacity style={styles.topButton} onPress={() => setPinListVisible(true)}>
+          <Text style={styles.topButtonText}>Details / My Pins ({pins.length})</Text>
+        </TouchableOpacity>
+      </View>
       <MapComponent
         locations={markers}
         onLongPress={(lat, lng) => handleSelectLocation(lat, lng)}
@@ -292,6 +326,42 @@ export default function Map() {
           <Text style={styles.overlayText}>{networkError}</Text>
         </View>
       )}
+      <Modal
+        visible={pinListVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPinListVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxHeight: "70%" }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={styles.modalTitle}>My Pins</Text>
+                <TouchableOpacity onPress={() => setPinListVisible(false)}>
+                  <Text style={{ color: "#b30059", fontWeight: "700" }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            {pins.length === 0 ? (
+              <Text style={{ color: "#555", marginTop: 8 }}>No saved locations</Text>
+            ) : (
+              <ScrollView style={styles.pinListScroll}>
+                {pins.map((pin) => (
+                  <View key={pin.id} style={styles.pinRow}>
+                    <View>
+                      <Text style={{ fontWeight: "700" }}>{CATEGORY_EMOJI[pin.category]} {pin.category}</Text>
+                      <Text style={{ color: "#555" }}>
+                        {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeletePin(pin.id)}>
+                      <Text style={{ color: "#ff6f61", fontWeight: "700" }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            </View>
+          </View>
+        </Modal>
       <Modal
         visible={pinModalVisible}
         transparent
@@ -318,7 +388,7 @@ export default function Map() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -362,4 +432,38 @@ const styles = StyleSheet.create({
   chipText: { color: "#b30059", fontWeight: "600" },
   modalClose: { alignSelf: "flex-end", paddingVertical: 6, paddingHorizontal: 8 },
   modalCloseText: { color: "#ff6f61", fontWeight: "600" },
+  topBar: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 50,
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    pointerEvents: "box-none",
+  },
+  topButton: {
+    backgroundColor: "#6c5ce7",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  topButtonText: { color: "#fff", fontWeight: "700" },
+  pinRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  pinListScroll: {
+    marginTop: 8,
+    maxHeight: 300,
+  },
 });
