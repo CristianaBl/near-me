@@ -6,6 +6,7 @@ const userRoutes = require("./users/user.routes");
 const authRoutes = require("./auth/auth.routes");
 const followRequestRoutes = require("./followRequests/followrequest.routes");
 const subscriptionRoutes = require("./subscriptions/subscription.routes");
+const locationRoutes = require("./locations/location.routes");
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/follow-requests", followRequestRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/locations", locationRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;

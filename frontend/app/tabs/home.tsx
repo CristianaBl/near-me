@@ -13,8 +13,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
-import User from "../models/User";
-import FollowRequest from "../models/FollowRequest";
+import User from "@/models/User";
+import FollowRequest from "@/models/FollowRequest";
 import { getAllUsers } from "@/services/userService";
 import {
   createFollowRequest,
@@ -23,6 +23,12 @@ import {
   deleteFollowRequest,
   updateFollowRequestStatus,
 } from "@/services/followRequestService";
+import {
+  createSubscription,
+  getSubscriptionsForTarget,
+  getSubscriptionsForViewer,
+  Subscription,
+} from "@/services/subscriptionService";
 import { getUserIdFromToken } from "@/utils/jwt";
 
 export default function Home() {
@@ -33,6 +39,8 @@ export default function Home() {
   const [followRequestsReceived, setFollowRequestsReceived] = useState<FollowRequest[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [subscriptionsFollowing, setSubscriptionsFollowing] = useState<Subscription[]>([]);
+  const [subscriptionsFollowers, setSubscriptionsFollowers] = useState<Subscription[]>([]);
 
   // Load current user id and all users
   useEffect(() => {
@@ -47,11 +55,21 @@ export default function Home() {
 
         // Load received requests
         const receivedRequests = await getFollowRequestsForUser(id || '');
-        setFollowRequestsReceived(receivedRequests ?? []);
+        setFollowRequestsReceived((receivedRequests ?? []).filter(r => r.status === "pending"));
 
         // Load sent requests
         const sentRequests = await getFollowRequestsSentByUser(id || '');
-        setFollowRequestsSent(sentRequests ?? []);
+        setFollowRequestsSent((sentRequests ?? []).filter(r => r.status === "pending"));
+
+        if (id) {
+          // Load subscriptions: who I follow and who follows me
+          const [following, followers] = await Promise.all([
+            getSubscriptionsForViewer(id),
+            getSubscriptionsForTarget(id),
+          ]);
+          setSubscriptionsFollowing(following ?? []);
+          setSubscriptionsFollowers(followers ?? []);
+        }
 
       } catch (err: any) {
         Alert.alert("Error", err.message);
@@ -104,10 +122,16 @@ export default function Home() {
   // Accept / Decline follow request
   const handleRequestAction = async (requestId: string, status: "accepted" | "rejected") => {
     try {
+      const request = followRequestsReceived.find((r) => r.id === requestId);
       await updateFollowRequestStatus(requestId, status);
-      setFollowRequestsReceived(prev =>
-        prev.filter(r => r.id !== requestId)
-      );
+      setFollowRequestsReceived(prev => prev.filter(r => r.id !== requestId));
+
+      if (status === "accepted" && request) {
+        // Create a subscription so the requester can view the target
+        const newSub = await createSubscription(request.requesterId, request.targetId);
+        setSubscriptionsFollowers((prev) => [...prev, newSub]);
+      }
+
       Alert.alert("Success", `Request ${status}`);
     } catch (err: any) {
       Alert.alert("Error", err.message);
@@ -117,6 +141,11 @@ export default function Home() {
 
   const getUserEmail = (request: FollowRequest) => {
     const user = users.find(u => u.id === request.requesterId);
+    return user ? user.email : "Unknown";
+  };
+
+  const getEmailById = (userId: string) => {
+    const user = users.find((u) => u.id === userId);
     return user ? user.email : "Unknown";
   };
 
@@ -188,6 +217,40 @@ export default function Home() {
           <Button title="Close" onPress={() => setModalVisible(false)} />
         </View>
       </Modal>
+
+      <View style={{ marginTop: 24 }}>
+        <Text style={styles.sectionTitle}>People you follow</Text>
+        {subscriptionsFollowing.length === 0 ? (
+          <Text style={styles.muted}>No subscriptions yet</Text>
+        ) : (
+          <FlatList
+            data={subscriptionsFollowing}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.listRow}>
+                <Text>{getEmailById(item.targetId)}</Text>
+              </View>
+            )}
+          />
+        )}
+      </View>
+
+      <View style={{ marginTop: 24 }}>
+        <Text style={styles.sectionTitle}>Followers</Text>
+        {subscriptionsFollowers.length === 0 ? (
+          <Text style={styles.muted}>No followers yet</Text>
+        ) : (
+          <FlatList
+            data={subscriptionsFollowers}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.listRow}>
+                <Text>{getEmailById(item.viewerId)}</Text>
+              </View>
+            )}
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -230,6 +293,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 8 },
+  muted: { color: "#777" },
+  listRow: {
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },

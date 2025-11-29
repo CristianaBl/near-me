@@ -26,7 +26,13 @@ export async function createSubscription(viewerId: string, targetId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to create subscription");
-  return data as Subscription;
+  const sub: any = data;
+  return {
+    id: sub.id ?? sub._id ?? sub.id,
+    viewerId: sub.viewerId,
+    targetId: sub.targetId,
+    createdAt: sub.createdAt,
+  } as Subscription;
 }
 
 // Get subscriptions for viewer
@@ -36,7 +42,12 @@ export async function getSubscriptionsForViewer(viewerId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch subscriptions");
-  return data as Subscription[];
+  return (data as any[]).map((sub) => ({
+    id: sub.id ?? sub._id ?? sub.id,
+    viewerId: sub.viewerId,
+    targetId: sub.targetId,
+    createdAt: sub.createdAt,
+  })) as Subscription[];
 }
 
 // Get subscriptions for target
@@ -46,7 +57,12 @@ export async function getSubscriptionsForTarget(targetId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch subscriptions");
-  return data as Subscription[];
+  return (data as any[]).map((sub) => ({
+    id: sub.id ?? sub._id ?? sub.id,
+    viewerId: sub.viewerId,
+    targetId: sub.targetId,
+    createdAt: sub.createdAt,
+  })) as Subscription[];
 }
 
 // Delete a subscription
