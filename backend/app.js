@@ -9,6 +9,7 @@ const authRoutes = require("./auth/auth.routes");
 const followRequestRoutes = require("./followRequests/followrequest.routes");
 const subscriptionRoutes = require("./subscriptions/subscription.routes");
 const locationRoutes = require("./locations/location.routes");
+const pinRoutes = require("./pins/pin.routes");
 
 const app = express();
 const server = http.createServer(app);
@@ -44,6 +45,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/follow-requests", followRequestRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/locations", locationRoutes);
+app.use("/api/pins", pinRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;

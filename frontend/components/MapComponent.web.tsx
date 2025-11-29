@@ -8,10 +8,13 @@ interface Location {
   description?: string;
   latitude: number;
   longitude: number;
+  category?: string;
+  kind?: "user" | "pin";
 }
 
 interface MapComponentProps {
   locations?: Location[];
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 type LeafletStuff = {
@@ -22,7 +25,7 @@ type LeafletStuff = {
   Popup: any;
 };
 
-export default function MapComponent({ locations = [] }: MapComponentProps) {
+export default function MapComponent({ locations = [], onMapClick }: MapComponentProps) {
   const [leaflet, setLeaflet] = useState<LeafletStuff | null>(null);
 
   useEffect(() => {
@@ -92,6 +95,13 @@ export default function MapComponent({ locations = [] }: MapComponentProps) {
         center={center}
         zoom={13}
         style={{ width: "100%", height: "100%" }}
+        eventHandlers={{
+          click: (e: any) => {
+            if (onMapClick && e?.latlng) {
+              onMapClick(e.latlng.lat, e.latlng.lng);
+            }
+          },
+        }}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -101,9 +111,16 @@ export default function MapComponent({ locations = [] }: MapComponentProps) {
           <Marker
             key={loc.id}
             position={[loc.latitude, loc.longitude]}
+            icon={
+              leaflet.L.divIcon({
+                className: "custom-pin",
+                html: `<div style="font-size:20px;">${iconFor(loc.kind, loc.category)}</div>`,
+                iconSize: [24, 24],
+              })
+            }
           >
             <Popup>
-              <strong>{loc.title}</strong>
+              <strong>{iconFor(loc.kind, loc.category)} {loc.title}</strong>
               <br />
               {loc.description}
             </Popup>
@@ -112,4 +129,17 @@ export default function MapComponent({ locations = [] }: MapComponentProps) {
       </MapContainer>
     </div>
   );
+}
+
+function iconFor(kind?: "user" | "pin", category?: string) {
+  if (kind === "user") return "🧑";
+  const map: Record<string, string> = {
+    home: "🏠",
+    school: "🏫",
+    church: "⛪",
+    work: "💼",
+    restaurant: "🍽️",
+    other: "📍",
+  };
+  return map[category || ""] || "📍";
 }

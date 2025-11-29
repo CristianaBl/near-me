@@ -1,6 +1,6 @@
 // components/MapComponent.native.tsx
 import React, { useState } from "react";
-import { View, StyleSheet, Dimensions } from "react-native";
+import { View, StyleSheet, Dimensions, Text } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 interface Location {
@@ -9,13 +9,38 @@ interface Location {
   description?: string;
   latitude: number;
   longitude: number;
+  category?: string;
+  kind?: "user" | "pin";
 }
 
 interface MapComponentProps {
   locations?: Location[];
+  onLongPress?: (latitude: number, longitude: number) => void;
 }
 
-export default function MapComponent({ locations = [] }: MapComponentProps) {
+export default function MapComponent({ locations = [], onLongPress }: MapComponentProps) {
+  const categoryColor: Record<string, string> = {
+    home: "#ff7eb6",
+    school: "#7ed957",
+    church: "#8e8cff",
+    work: "#ffc107",
+    restaurant: "#ff6f61",
+    other: "#0096c7",
+  };
+
+  const iconFor = (loc: Location) => {
+    if (loc.kind === "user") return "🧑";
+    const map: Record<string, string> = {
+      home: "🏠",
+      school: "🏫",
+      church: "⛪",
+      work: "💼",
+      restaurant: "🍽️",
+      other: "📍",
+    };
+    return map[loc.category || ""] || "📍";
+  };
+
   const [region, setRegion] = useState({
     latitude: 46.7712, // Cluj-Napoca
     longitude: 23.6236,
@@ -32,6 +57,10 @@ export default function MapComponent({ locations = [] }: MapComponentProps) {
         showsUserLocation
         showsMyLocationButton
         onRegionChangeComplete={setRegion}
+        onLongPress={(e) => {
+          const { latitude, longitude } = e.nativeEvent.coordinate;
+          onLongPress?.(latitude, longitude);
+        }}
       >
         {locations.map((loc) => (
           <Marker
@@ -39,7 +68,25 @@ export default function MapComponent({ locations = [] }: MapComponentProps) {
             coordinate={{ latitude: loc.latitude, longitude: loc.longitude }}
             title={loc.title}
             description={loc.description}
-          />
+            tracksViewChanges
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 8,
+                backgroundColor:
+                  loc.kind === "user"
+                    ? "#6c5ce7"
+                    : categoryColor[loc.category || "other"] || categoryColor.other,
+                borderRadius: 14,
+                borderWidth: 2,
+                borderColor: "#fff",
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>{iconFor(loc)}</Text>
+            </View>
+          </Marker>
         ))}
       </MapView>
     </View>
