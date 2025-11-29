@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform } from "react-native";
+import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -31,6 +31,8 @@ export default function UserDetail() {
   const [pending, setPending] = useState(false);
   const [pins, setPins] = useState<Pin[]>([]);
   const [watches, setWatches] = useState<Watch[]>([]);
+  const [selectedEventType, setSelectedEventType] = useState<"arrival" | "departure">("arrival");
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -131,12 +133,16 @@ export default function UserDetail() {
     }
   };
 
-  const handleCreateWatch = async (pinId: string, eventType: "arrival" | "departure") => {
+  const handleCreateWatch = async () => {
     if (!currentUserId || !targetId) return;
+    if (!selectedPinId) {
+      Alert.alert("Select a pin", "Please choose a pin to watch.");
+      return;
+    }
     try {
-      await createArrivalWatch(currentUserId, targetId, pinId, 100, eventType);
+      await createArrivalWatch(currentUserId, targetId, selectedPinId, 100, selectedEventType);
       await loadData(currentUserId, targetId);
-      Alert.alert("Watch added", `You will be notified on ${eventType}.`);
+      Alert.alert("Watch added", `You will be notified on ${selectedEventType}.`);
     } catch (err: any) {
       Alert.alert("Error", err.message);
     }
@@ -189,24 +195,58 @@ export default function UserDetail() {
       <Text style={styles.caption}>Get notified when {targetEmail || "they"} arrive at or leave one of your saved pins.</Text>
 
       <Text style={styles.subheading}>Add alert</Text>
-      <FlatList
-        data={pins}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.listRow}>
-            <Text>{item.category} ({item.latitude.toFixed(4)}, {item.longitude.toFixed(4)})</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TouchableOpacity onPress={() => handleCreateWatch(item.id, "arrival")}>
-                <Text style={{ color: "#6c5ce7" }}>Arrival</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleCreateWatch(item.id, "departure")}>
-                <Text style={{ color: "#ff6f61" }}>Departure</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.caption}>No pins saved yet.</Text>}
-      />
+      <View style={styles.pickerRow}>
+        <View style={styles.pillToggle}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, selectedEventType === "arrival" && styles.toggleBtnActive]}
+            onPress={() => setSelectedEventType("arrival")}
+          >
+            <Text style={[styles.toggleText, selectedEventType === "arrival" && styles.toggleTextActive]}>
+              Arrival
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, selectedEventType === "departure" && styles.toggleBtnActive]}
+            onPress={() => setSelectedEventType("departure")}
+          >
+            <Text style={[styles.toggleText, selectedEventType === "departure" && styles.toggleTextActive]}>
+              Departure
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.selectBox}>
+          {pins.length === 0 ? (
+            <Text style={styles.caption}>No pins saved yet.</Text>
+          ) : (
+            <ScrollView>
+              {pins.map((pin) => (
+                <TouchableOpacity
+                  key={pin.id}
+                  style={[
+                    styles.selectItem,
+                    selectedPinId === pin.id && styles.selectItemActive,
+                  ]}
+                  onPress={() => setSelectedPinId(pin.id)}
+                >
+                  <Text style={{ color: selectedPinId === pin.id ? "#fff" : "#333" }}>
+                    {pin.category} ({pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+      <TouchableOpacity
+        style={[
+          styles.primaryBtn,
+          { marginTop: 8, opacity: selectedPinId ? 1 : 0.5 },
+        ]}
+        disabled={!selectedPinId}
+        onPress={handleCreateWatch}
+      >
+        <Text style={styles.btnText}>Add alert</Text>
+      </TouchableOpacity>
 
       <Text style={styles.subheading}>Active alerts</Text>
       <FlatList
@@ -254,13 +294,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  backBtn: {
-    marginTop: 16,
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: "#ccc",
-    borderRadius: 8,
+  pickerRow: { gap: 8, marginBottom: 8 },
+  pillToggle: {
+    flexDirection: "row",
+    backgroundColor: "#f3e9f7",
+    borderRadius: 12,
+    padding: 4,
   },
-  backText: { color: "#333", fontWeight: "600" },
+  toggleBtn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 10 },
+  toggleBtnActive: { backgroundColor: "#6c5ce7" },
+  toggleText: { color: "#6c5ce7", fontWeight: "700" },
+  toggleTextActive: { color: "#fff" },
+  selectBox: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 6,
+    backgroundColor: "#fafafa",
+    maxHeight: 200,
+  },
+  selectItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  selectItemActive: {
+    backgroundColor: "#6c5ce7",
+    borderColor: "#6c5ce7",
+  },
 });
