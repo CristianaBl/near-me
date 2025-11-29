@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, ScrollView, Dimensions } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
@@ -7,6 +7,7 @@ import { getUserById, updateUser } from "@/services/userService";
 import { getUserIdFromToken } from "@/utils/jwt";
 
 export default function ProfileScreen() {
+  const SCREEN_HEIGHT = Dimensions.get("window").height;
   const router = useRouter();
 
   const [userId, setUserId] = useState<string>("");
@@ -59,8 +60,10 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Profile</Text>
+    <ScrollView contentContainerStyle={[styles.container, { minHeight: SCREEN_HEIGHT * 0.9, paddingBottom: 40 }]}>
+      <View style={styles.ribbonOne} />
+      <View style={styles.ribbonTwo} />
+      <Text style={styles.header}>My Profile</Text>
 
       {/* EMAIL */}
       <Text style={styles.label}>Email</Text>
@@ -92,49 +95,115 @@ export default function ProfileScreen() {
       {/* BUTTONS */}
       <View style={styles.buttonContainer}>
         {!isEditing ? (
-          <Button title="Edit Profile" onPress={() => setIsEditing(true)} />
+          <FancyButton title="Edit Profile" onPress={() => setIsEditing(true)} />
         ) : (
           <>
-            <Button title="Save Changes" onPress={handleSave} />
+            <FancyButton title="Save Changes" onPress={handleSave} />
             <View style={{ height: 10 }} />
-            <Button title="Cancel" color="gray" onPress={() => setIsEditing(false)} />
+            <FancyButton title="Cancel" color="#b2bec3" textColor="#2d3436" onPress={() => setIsEditing(false)} />
           </>
         )}
 
         <View style={{ height: 20 }} />
-        <Button title="Logout" color="#d9534f" onPress={logout} />
+        <FancyButton title="Logout" color="#ff6f61" onPress={logout} />
       </View>
-    </View>
+    </ScrollView>
+  );
+}
+
+function FancyButton({
+  title,
+  onPress,
+  color = "#ff7eb6",
+  textColor = "#fff",
+}: {
+  title: string;
+  onPress: () => void;
+  color?: string;
+  textColor?: string;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPress}
+      style={[styles.fancyButton, { backgroundColor: color }]}
+    >
+      <Text style={[styles.fancyButtonText, { color: textColor }]}>{title}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
-    gap: 8,
+    gap: 10,
+    backgroundColor: "#fff0f6",
+    paddingBottom: 60,
+    position: "relative",
   },
   header: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 30,
+    fontWeight: "800",
     marginBottom: 20,
     textAlign: "center",
+    color: "#b30059",
   },
   label: {
-    fontSize: 16,
+    fontSize: 15,
     marginTop: 10,
+    color: "#a8547a",
+    fontWeight: "600",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 5,
+    borderColor: "#ffb6d9",
+    padding: 12,
+    borderRadius: 14,
+    marginTop: 6,
+    backgroundColor: "#fff",
   },
   disabled: {
-    backgroundColor: "#eee",
+    backgroundColor: "#f7f0f5",
   },
   buttonContainer: {
     marginTop: 30,
+    gap: 10,
+  },
+  fancyButton: {
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: "center",
+    shadowColor: "#ff99c8",
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  fancyButtonText: {
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  ribbonOne: {
+    position: "absolute",
+    top: -50,
+    left: -80,
+    width: 240,
+    height: 240,
+    backgroundColor: "#ffe6f2",
+    borderRadius: 120,
+    transform: [{ rotate: "-10deg" }],
+    opacity: 0.6,
+  },
+  ribbonTwo: {
+    position: "absolute",
+    bottom: -70,
+    right: -40,
+    width: 220,
+    height: 220,
+    backgroundColor: "#ffd1e8",
+    borderRadius: 110,
+    transform: [{ rotate: "15deg" }],
+    opacity: 0.5,
   },
 });

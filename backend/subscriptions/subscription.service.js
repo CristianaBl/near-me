@@ -19,4 +19,8 @@ async function removeSubscription(id) {
   return Subscription.findByIdAndDelete(id);
 }
 
-module.exports = { createSubscription, getSubscriptionsForViewer, getSubscriptionsForTarget, removeSubscription };
+async function removeByUsers(viewerId, targetId) {
+  return Subscription.findOneAndDelete({ viewerId, targetId });
+}
+
+module.exports = { createSubscription, getSubscriptionsForViewer, getSubscriptionsForTarget, removeSubscription, removeByUsers };

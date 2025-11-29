@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Platform, Dimensions } from "react-native";
 import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -18,6 +18,7 @@ type Marker = {
 const UPDATE_MS = 3000;
 
 export default function Map() {
+  const SCREEN_HEIGHT = Dimensions.get("window").height;
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [followingLocations, setFollowingLocations] = useState<UserLocation[]>([]);
   const [myLocation, setMyLocation] = useState<ExpoLocation.LocationObject | null>(null);
@@ -180,7 +181,7 @@ export default function Map() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: SCREEN_HEIGHT * 0.9, paddingBottom: 40 }]}>
       <MapComponent locations={markers} />
       {!markers.length && (
         <View style={styles.overlay}>

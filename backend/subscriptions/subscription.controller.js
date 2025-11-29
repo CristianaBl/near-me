@@ -40,4 +40,18 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { create, getForViewer, getForTarget, remove };
+async function removeByUsers(req, res) {
+  try {
+    const { viewerId, targetId } = req.query;
+    if (!viewerId || !targetId) {
+      return res.status(400).json({ message: "viewerId and targetId are required" });
+    }
+    const deleted = await subscriptionService.removeByUsers(viewerId, targetId);
+    if (!deleted) return res.status(404).json({ message: "Subscription not found" });
+    res.json({ message: "Deleted" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+module.exports = { create, getForViewer, getForTarget, remove, removeByUsers };

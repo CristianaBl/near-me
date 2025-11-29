@@ -1,6 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const userRoutes = require("./users/user.routes");
 const authRoutes = require("./auth/auth.routes");
@@ -9,6 +11,23 @@ const subscriptionRoutes = require("./subscriptions/subscription.routes");
 const locationRoutes = require("./locations/location.routes");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+// Expose io for routes/controllers
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  socket.on("register", (userId) => {
+    if (userId) {
+      socket.join(userId);
+    }
+  });
+});
 
 // Connect to MongoDB
 connectDB();
@@ -28,6 +47,6 @@ app.use("/api/locations", locationRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://172.20.10.2:${PORT}`);
 });

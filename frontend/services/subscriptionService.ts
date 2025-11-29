@@ -75,3 +75,14 @@ export async function deleteSubscription(id: string) {
   if (!res.ok) throw new Error(data.message || "Failed to delete subscription");
   return data;
 }
+
+// Delete by viewer/target pair
+export async function deleteSubscriptionByUsers(viewerId: string, targetId: string) {
+  const res = await fetch(`${API_URL}/subscriptions?viewerId=${viewerId}&targetId=${targetId}`, {
+    method: "DELETE",
+    headers: await authHeader(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to delete subscription");
+  return data;
+}

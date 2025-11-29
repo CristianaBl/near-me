@@ -14,4 +14,7 @@ router.get("/target/:targetId", controller.getForTarget);
 // delete subscription
 router.delete("/:id", controller.remove);
 
+// delete subscription by viewer/target pair
+router.delete("/", controller.removeByUsers);
+
 module.exports = router;

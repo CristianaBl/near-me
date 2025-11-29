@@ -1,10 +1,16 @@
 const followRequestService = require("./followrequest.service");
 const { toRequestDTO, toRequestListDTO } = require('./followrequest.dto');
+const userService = require("../users/user.service");
 
 async function create(req, res) {
   try {
     const { requesterId, targetId } = req.body;
     const request = await followRequestService.createFollowRequest(requesterId, targetId);
+    // notify target in real time
+    const io = req.app.get("io");
+    if (io) {
+      io.to(String(targetId)).emit("follow-request", toRequestDTO(request));
+    }
     res.status(201).json({request: toRequestDTO(request)});
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -35,8 +41,25 @@ async function updateStatus(req, res) {
   try {
     const id = req.params.id;
     const { status } = req.body;
-    const updated = await followRequestService.updateFollowRequestStatus(id, status);
-    res.json({request: toRequestDTO(updated)});
+    if (status === "rejected") {
+      // Delete the request so it can be sent again later
+      const deleted = await followRequestService.deleteFollowRequest(id);
+      return res.json({ request: deleted ? toRequestDTO(deleted) : null });
+    } else {
+      const updated = await followRequestService.updateFollowRequestStatus(id, status);
+      // notify requester on accept
+      if (status === "accepted") {
+        const io = req.app.get("io");
+        if (io) {
+          const target = await userService.getUserById(updated.targetId);
+          io.to(String(updated.requesterId)).emit("follow-request-accepted", {
+            request: toRequestDTO(updated),
+            acceptedByEmail: target?.email,
+          });
+        }
+      }
+      res.json({request: toRequestDTO(updated)});
+    }
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
