@@ -338,24 +338,20 @@ export default function Home() {
     if (!targetId) return;
     try {
       if (enable) {
-        const newSub = await createSubscription(viewerId, targetId);
-        setSubscriptionsFollowers((prev) => {
-          const existing = prev.find((s) => s.viewerId === viewerId && s.targetId === targetId);
-          if (existing) {
-            return prev.map((s) =>
-              s.viewerId === viewerId && s.targetId === targetId ? { ...newSub, canSee: true } : s
-            );
-          }
-          return [...prev, { ...newSub, canSee: true }];
-        });
-      } else {
-        await deleteSubscriptionByUsers(viewerId, targetId);
-        setSubscriptionsFollowers((prev) =>
-          prev.map((s) =>
-            s.viewerId === viewerId && s.targetId === targetId ? { ...s, canSee: false } : s
-          )
+        // Subscriptions are created only on accept; do not recreate here
+        const exists = subscriptionsFollowers.some(
+          (s) => s.viewerId === viewerId && s.targetId === targetId && s.canSee !== false
         );
+        if (!exists) {
+          Alert.alert("Unavailable", "Grant access by accepting a follow request.");
+        }
+        return;
       }
+
+      await deleteSubscriptionByUsers(viewerId, targetId);
+      setSubscriptionsFollowers((prev) =>
+        prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
+      );
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not update access");
     }

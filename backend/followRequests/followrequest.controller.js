@@ -57,6 +57,8 @@ async function updateStatus(req, res) {
             acceptedByEmail: target?.email,
           });
         }
+        // Remove accepted request to clean up pending lists
+        await followRequestService.deleteFollowRequest(id);
       }
       res.json({request: toRequestDTO(updated)});
     }
