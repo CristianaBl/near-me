@@ -338,20 +338,24 @@ export default function Home() {
     if (!targetId) return;
     try {
       if (enable) {
-        // Subscriptions are created only on accept; do not recreate here
-        const exists = subscriptionsFollowers.some(
-          (s) => s.viewerId === viewerId && s.targetId === targetId && s.canSee !== false
+        const newSub = await createSubscription(viewerId, targetId);
+        setSubscriptionsFollowers((prev) => {
+          const existing = prev.find((s) => s.viewerId === viewerId && s.targetId === targetId);
+          if (existing) {
+            return prev.map((s) =>
+              s.viewerId === viewerId && s.targetId === targetId ? { ...newSub, canSee: true } : s
+            );
+          }
+          return [...prev, { ...newSub, canSee: true }];
+        });
+      } else {
+        await deleteSubscriptionByUsers(viewerId, targetId);
+        setSubscriptionsFollowers((prev) =>
+          prev.map((s) =>
+            s.viewerId === viewerId && s.targetId === targetId ? { ...s, canSee: false } : s
+          )
         );
-        if (!exists) {
-          Alert.alert("Unavailable", "Grant access by accepting a follow request.");
-        }
-        return;
       }
-
-      await deleteSubscriptionByUsers(viewerId, targetId);
-      setSubscriptionsFollowers((prev) =>
-        prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
-      );
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not update access");
     }
@@ -523,7 +527,7 @@ export default function Home() {
           </View>
 
             <View style={{ marginTop: 24 }}>
-              <Text style={styles.sectionTitle}>Who can see my location</Text>
+              <Text style={styles.sectionTitle}>Followers</Text>
               {subscriptionsFollowers.length === 0 ? (
                 <View style={styles.emptyPill}>
                   <Text style={styles.emptyText}>No one sees your location yet</Text>
@@ -532,35 +536,14 @@ export default function Home() {
                 subscriptionsFollowers.map((item) => (
                   <View key={item.id} style={[styles.listRow, styles.listRowActions]}>
                     <Text>{getEmailById(item.viewerId)}</Text>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      {isFollowingUser(item.viewerId) ? (
-                        <FancyButton
-                          title="Unfollow"
-                          color="#ff6f61"
-                          onPress={() => handleUnfollow(item.viewerId)}
-                        />
-                      ) : getPendingRequest(item.viewerId) ? (
-                        <FancyButton
-                          title="Cancel request"
-                          color="#ffc1dc"
-                          onPress={() => handleCancelRequest(item.viewerId)}
-                        />
-                      ) : (
-                        <FancyButton
-                          title="Follow Back"
-                          color="#7ed957"
-                          onPress={() => handleFollowBack(item.viewerId)}
-                        />
-                      )}
-                      <View style={{ alignItems: "center" }}>
-                        <Text style={styles.muted}>Allow location</Text>
-                        <Switch
-                          value={item.canSee !== false}
-                          onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
-                          thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
-                          trackColor={{ true: "#ffd6ec", false: "#ddd" }}
-                        />
-                      </View>
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={styles.muted}>Allow location</Text>
+                      <Switch
+                        value={item.canSee !== false}
+                        onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
+                        thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
+                        trackColor={{ true: "#ffd6ec", false: "#ddd" }}
+                      />
                     </View>
                   </View>
                 ))
