@@ -52,5 +52,5 @@ app.use("/api/arrival-watches", arrivalWatchRoutes);
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://172.20.10.2:${PORT}`);
+  console.log(`Server running on ${process.env.BACKEND_URI}:${PORT}`);
 });
