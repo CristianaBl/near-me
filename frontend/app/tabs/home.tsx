@@ -351,9 +351,7 @@ export default function Home() {
       } else {
         await deleteSubscriptionByUsers(viewerId, targetId);
         setSubscriptionsFollowers((prev) =>
-          prev.map((s) =>
-            s.viewerId === viewerId && s.targetId === targetId ? { ...s, canSee: false } : s
-          )
+          prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
         );
       }
     } catch (err: any) {
@@ -536,14 +534,28 @@ export default function Home() {
                 subscriptionsFollowers.map((item) => (
                   <View key={item.id} style={[styles.listRow, styles.listRowActions]}>
                     <Text>{getEmailById(item.viewerId)}</Text>
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={styles.muted}>Allow location</Text>
-                      <Switch
-                        value={item.canSee !== false}
-                        onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
-                        thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
-                        trackColor={{ true: "#ffd6ec", false: "#ddd" }}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      {!isFollowingUser(item.viewerId) && !getPendingRequest(item.viewerId) && (
+                        <FancyButton
+                          title="Follow back"
+                          color="#7ed957"
+                          onPress={() => handleFollowBack(item.viewerId)}
+                        />
+                      )}
+                      <FancyButton
+                        title="Revoke"
+                        color="#d9534f"
+                        onPress={() => toggleViewerAccess(item.viewerId, false)}
                       />
+                      <View style={{ alignItems: "center" }}>
+                        <Text style={styles.muted}>Allow location</Text>
+                        <Switch
+                          value={item.canSee !== false}
+                          onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
+                          thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
+                          trackColor={{ true: "#ffd6ec", false: "#ddd" }}
+                        />
+                      </View>
                     </View>
                   </View>
                 ))

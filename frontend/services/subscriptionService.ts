@@ -2,6 +2,23 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URI ?? "http://172.20.10.2:3000"}/api`;
 
+function toIdString(value: any) {
+  if (typeof value === "string") return value;
+  if (value?._id) return String(value._id);
+  if (value?.id) return String(value.id);
+  if (value?.toString) return String(value.toString());
+  return "";
+}
+
+function normalizeSubscription(sub: any) {
+  return {
+    id: sub.id ?? sub._id ?? sub.id ?? "",
+    viewerId: toIdString(sub.viewerId),
+    targetId: toIdString(sub.targetId),
+    createdAt: sub.createdAt,
+  };
+}
+
 async function authHeader() {
   const token = await AsyncStorage.getItem("token");
   return {
@@ -26,13 +43,7 @@ export async function createSubscription(viewerId: string, targetId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to create subscription");
-  const sub: any = data;
-  return {
-    id: sub.id ?? sub._id ?? sub.id,
-    viewerId: sub.viewerId,
-    targetId: sub.targetId,
-    createdAt: sub.createdAt,
-  } as Subscription;
+  return normalizeSubscription(data) as Subscription;
 }
 
 // Get subscriptions for viewer
@@ -42,12 +53,7 @@ export async function getSubscriptionsForViewer(viewerId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch subscriptions");
-  return (data as any[]).map((sub) => ({
-    id: sub.id ?? sub._id ?? sub.id,
-    viewerId: sub.viewerId,
-    targetId: sub.targetId,
-    createdAt: sub.createdAt,
-  })) as Subscription[];
+  return (data as any[]).map(normalizeSubscription) as Subscription[];
 }
 
 // Get subscriptions for target
@@ -57,12 +63,7 @@ export async function getSubscriptionsForTarget(targetId: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch subscriptions");
-  return (data as any[]).map((sub) => ({
-    id: sub.id ?? sub._id ?? sub.id,
-    viewerId: sub.viewerId,
-    targetId: sub.targetId,
-    createdAt: sub.createdAt,
-  })) as Subscription[];
+  return (data as any[]).map(normalizeSubscription) as Subscription[];
 }
 
 // Delete a subscription
