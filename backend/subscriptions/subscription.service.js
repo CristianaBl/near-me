@@ -2,13 +2,23 @@ const Subscription = require("./subscription.model");
 
 async function createSubscription(viewerId, targetId) {
   const exists = await Subscription.findOne({ viewerId, targetId });
-  if (exists) throw new Error("Subscription already exists");
+  if (exists) {
+    if (!exists.enabled) {
+      exists.enabled = true;
+      await exists.save();
+      return exists;
+    }
+    throw new Error("Subscription already exists");
+  }
 
-  return Subscription.create({ viewerId, targetId });
+  return Subscription.create({ viewerId, targetId, enabled: true });
 }
 
 async function getSubscriptionsForViewer(viewerId) {
-  return Subscription.find({ viewerId }).sort({ createdAt: -1 });
+  return Subscription.find({
+    viewerId,
+    $or: [{ enabled: true }, { enabled: { $exists: false } }],
+  }).sort({ createdAt: -1 });
 }
 
 async function getSubscriptionsForTarget(targetId) {
@@ -23,4 +33,12 @@ async function removeByUsers(viewerId, targetId) {
   return Subscription.findOneAndDelete({ viewerId, targetId });
 }
 
-module.exports = { createSubscription, getSubscriptionsForViewer, getSubscriptionsForTarget, removeSubscription, removeByUsers };
+async function setEnabled(viewerId, targetId, enabled) {
+  return Subscription.findOneAndUpdate(
+    { viewerId, targetId },
+    { enabled },
+    { new: true }
+  );
+}
+
+module.exports = { createSubscription, getSubscriptionsForViewer, getSubscriptionsForTarget, removeSubscription, removeByUsers, setEnabled };

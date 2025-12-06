@@ -16,6 +16,7 @@ function normalizeSubscription(sub: any) {
     viewerId: toIdString(sub.viewerId),
     targetId: toIdString(sub.targetId),
     createdAt: sub.createdAt,
+    enabled: sub.enabled !== false,
   };
 }
 
@@ -32,6 +33,7 @@ export type Subscription = {
   viewerId: string;
   targetId: string;
   createdAt: string;
+  enabled?: boolean;
 };
 
 // Create a subscription
@@ -86,4 +88,15 @@ export async function deleteSubscriptionByUsers(viewerId: string, targetId: stri
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to delete subscription");
   return data;
+}
+
+export async function setSubscriptionEnabled(viewerId: string, targetId: string, enabled: boolean) {
+  const res = await fetch(`${API_URL}/subscriptions/enabled`, {
+    method: "PUT",
+    headers: await authHeader(),
+    body: JSON.stringify({ viewerId, targetId, enabled }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to update subscription");
+  return normalizeSubscription(data) as Subscription;
 }

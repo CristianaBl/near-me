@@ -17,4 +17,7 @@ router.delete("/:id", controller.remove);
 // delete subscription by viewer/target pair
 router.delete("/", controller.removeByUsers);
 
+// toggle subscription enabled
+router.put("/enabled", controller.setEnabled);
+
 module.exports = router;

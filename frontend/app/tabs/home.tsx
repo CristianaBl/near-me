@@ -33,6 +33,7 @@ import {
   getSubscriptionsForViewer,
   Subscription,
   deleteSubscriptionByUsers,
+  setSubscriptionEnabled,
 } from "@/services/subscriptionService";
 import { getUserIdFromToken } from "@/utils/jwt";
 
@@ -212,7 +213,7 @@ export default function Home() {
           getSubscriptionsForTarget(id),
         ]);
         setSubscriptionsFollowing(following ?? []);
-        setSubscriptionsFollowers((followers ?? []).map((f) => ({ ...f, canSee: true })));
+        setSubscriptionsFollowers((followers ?? []).map((f) => ({ ...f, canSee: f.enabled !== false })));
       }
     } catch (err: any) {
       Alert.alert("Error", err.message);
@@ -349,9 +350,11 @@ export default function Home() {
           return [...prev, { ...newSub, canSee: true }];
         });
       } else {
-        await deleteSubscriptionByUsers(viewerId, targetId);
+        const updated = await setSubscriptionEnabled(viewerId, targetId, false);
         setSubscriptionsFollowers((prev) =>
-          prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
+          prev.map((s) =>
+            s.viewerId === viewerId && s.targetId === targetId ? { ...s, canSee: updated.enabled !== false } : s
+          )
         );
       }
     } catch (err: any) {

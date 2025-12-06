@@ -11,7 +11,10 @@ async function upsertLocation(userId, latitude, longitude) {
 }
 
 async function getLocationsForViewer(viewerId) {
-  const subs = await Subscription.find({ viewerId }).select("targetId");
+  const subs = await Subscription.find({
+    viewerId,
+    $or: [{ enabled: true }, { enabled: { $exists: false } }],
+  }).select("targetId");
   const targetIds = subs.map((s) => s.targetId);
   if (!targetIds.length) return [];
 

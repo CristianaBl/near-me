@@ -54,4 +54,18 @@ async function removeByUsers(req, res) {
   }
 }
 
-module.exports = { create, getForViewer, getForTarget, remove, removeByUsers };
+async function setEnabled(req, res) {
+  try {
+    const { viewerId, targetId, enabled } = req.body;
+    if (!viewerId || !targetId || typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "viewerId, targetId and enabled are required" });
+    }
+    const updated = await subscriptionService.setEnabled(viewerId, targetId, enabled);
+    if (!updated) return res.status(404).json({ message: "Subscription not found" });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+module.exports = { create, getForViewer, getForTarget, remove, removeByUsers, setEnabled };
