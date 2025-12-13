@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Platform, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView } from "react-native";
+import { io } from "socket.io-client";
 import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -7,6 +8,7 @@ import MapComponent from "@/components/MapComponent";
 import { getUserIdFromToken } from "@/utils/jwt";
 import { getFollowingLocations, updateLocation, UserLocation } from "@/services/locationService";
 import { createPin, getPins, deletePin, Pin, PinCategory } from "@/services/pinService";
+import { listArrivalWatches } from "@/services/arrivalWatchService";
 
 type Marker = {
   id: string;
@@ -16,6 +18,16 @@ type Marker = {
   longitude: number;
   category?: PinCategory;
   kind?: "user" | "pin";
+};
+
+type ArrivalUpdate = {
+  id: string;
+  targetId: string;
+  pinId?: string;
+  pinLat?: number;
+  pinLng?: number;
+  eventType: "arrival" | "departure";
+  timestamp: string;
 };
 
 const UPDATE_MS = 3000;
@@ -28,7 +40,7 @@ const CATEGORY_EMOJI: Record<PinCategory, string> = {
   other: "📍",
 };
 
-export default function Map() {
+export default function MapScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [followingLocations, setFollowingLocations] = useState<UserLocation[]>([]);
   const [myLocation, setMyLocation] = useState<ExpoLocation.LocationObject | null>(null);
@@ -36,6 +48,7 @@ export default function Map() {
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinListVisible, setPinListVisible] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [arrivalUpdates, setArrivalUpdates] = useState<ArrivalUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
@@ -176,6 +189,86 @@ export default function Map() {
     loadPins();
   }, [currentUserId]);
 
+  // Load arrival/departure watches to seed updates (notifications on)
+  useEffect(() => {
+    if (!currentUserId) return;
+    const loadWatches = async () => {
+      try {
+        const watches = await listArrivalWatches(currentUserId);
+        const seeded =
+          (watches ?? [])
+            .map((w: any) => {
+              const lastInside = w.lastInside;
+              const eventType = w.eventType === "departure" ? "departure" : "arrival";
+              const hasEvent =
+                (eventType === "arrival" && lastInside === true) ||
+                (eventType === "departure" && lastInside === false);
+              if (!hasEvent) return null;
+              const pinObj = typeof w.pinId === "object" ? w.pinId : undefined;
+              return {
+                id: String(w._id ?? w.id ?? w.watchId ?? `${w.targetId}-${eventType}`),
+                targetId: String(w.targetId),
+                pinId: pinObj?._id ? String(pinObj._id) : w.pinId ? String(w.pinId) : undefined,
+                pinLat: pinObj?.latitude,
+                pinLng: pinObj?.longitude,
+                eventType,
+                timestamp: w.updatedAt || w.createdAt || new Date().toISOString(),
+              } as ArrivalUpdate;
+            })
+            .filter(Boolean) as ArrivalUpdate[];
+
+        setArrivalUpdates((prev) => {
+          const merged = [...seeded, ...prev];
+          const unique = new globalThis.Map<string, ArrivalUpdate>();
+          merged.forEach((u) => {
+            unique.set(`${u.id}-${u.eventType}-${u.timestamp}`, u);
+          });
+          return Array.from(unique.values()).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+        });
+      } catch (err) {
+        console.error("Failed to load arrival watches", err);
+      }
+    };
+
+    loadWatches();
+  }, [currentUserId]);
+
+  // Live socket updates for arrival/departure events
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const backend = process.env.EXPO_PUBLIC_BACKEND_URI || "http://172.20.10.2:3000";
+    const s = io(backend, { transports: ["websocket"] });
+    s.emit("register", currentUserId);
+    s.on("arrival-triggered", (payload: any) => {
+      const update: ArrivalUpdate = {
+        id: payload.watchId ? String(payload.watchId) : `${payload.targetId}-${Date.now()}`,
+        targetId: String(payload.targetId),
+        pinId: payload.pinId ? String(payload.pinId) : undefined,
+        pinLat: payload.pinLat,
+        pinLng: payload.pinLng,
+        eventType: payload.eventType === "departure" ? "departure" : "arrival",
+        timestamp: new Date().toISOString(),
+      };
+      setArrivalUpdates((prev) => {
+        const merged = [update, ...prev];
+        const unique = new globalThis.Map<string, ArrivalUpdate>();
+        merged.forEach((u) => {
+          unique.set(`${u.id}-${u.eventType}-${u.timestamp}`, u);
+        });
+        return Array.from(unique.values()).sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        ).slice(0, 50);
+      });
+    });
+
+    return () => {
+      s.disconnect();
+    };
+  }, [currentUserId]);
+
   const markers: Marker[] = useMemo(() => {
     const others = followingLocations.map((loc) => ({
       id: loc.userId,
@@ -212,22 +305,26 @@ export default function Map() {
     return [...me, ...others, ...myPins];
   }, [followingLocations, myLocation, pins]);
 
-  const followingUpdates = useMemo(
-    () =>
-      [...followingLocations]
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-        .map((loc) => ({
-          ...loc,
-          displayName:
-            loc.email ||
-            [loc.firstName, loc.lastName].filter(Boolean).join(" ").trim() ||
-            "User",
-        })),
-    [followingLocations]
-  );
+  const formatUserName = (userId: string) => {
+    const loc = followingLocations.find((u) => u.userId === userId);
+    if (!loc) return "User";
+    const name = [loc.firstName, loc.lastName].filter(Boolean).join(" ").trim();
+    return loc.email || name || "User";
+  };
+
+  const formatLocationLabel = (update: ArrivalUpdate) => {
+    const pinMatch = pins.find(
+      (p) =>
+        p.id === update.pinId ||
+        `pin-${p.id}` === update.pinId ||
+        String(p.id) === update.pinId
+    );
+    if (pinMatch) return `${CATEGORY_EMOJI[pinMatch.category]} ${pinMatch.category}`;
+    if (typeof update.pinLat === "number" && typeof update.pinLng === "number") {
+      return `${update.pinLat.toFixed(5)}, ${update.pinLng.toFixed(5)}`;
+    }
+    return "this location";
+  };
 
   const ensureUserId = async () => {
     if (currentUserId) return currentUserId;
@@ -318,11 +415,6 @@ export default function Map() {
 
   return (
     <SafeAreaView style={[styles.container]}>
-      <View style={[styles.topBar, { paddingTop: 50 }]}>
-        <TouchableOpacity style={styles.topButton} onPress={() => setPinListVisible(true)}>
-          <Text style={styles.topButtonText}>My Pins ({pins.length})</Text>
-        </TouchableOpacity>
-      </View>
       <View style={styles.mapSection}>
         <MapComponent
           locations={markers}
@@ -346,27 +438,31 @@ export default function Map() {
       </View>
 
       <View style={styles.updatesContainer}>
+        <TouchableOpacity
+          style={styles.inlineLink}
+          onPress={() => setPinListVisible(true)}
+        >
+          <Text style={styles.inlineLinkText}>My Pins</Text>
+        </TouchableOpacity>
         <View style={styles.updatesHeader}>
           <Text style={styles.sectionTitle}>Updates</Text>
           <View style={styles.countPill}>
-            <Text style={styles.countPillText}>{followingUpdates.length}</Text>
+            <Text style={styles.countPillText}>{arrivalUpdates.length}</Text>
           </View>
         </View>
-        {followingUpdates.length === 0 ? (
+        {arrivalUpdates.length === 0 ? (
           <Text style={{ color: "#555", marginTop: 8 }}>No updates yet.</Text>
         ) : (
           <ScrollView style={styles.updatesList}>
-            {followingUpdates.map((loc) => (
-              <View key={loc.id} style={styles.updateRow}>
+            {arrivalUpdates.map((update) => (
+              <View key={`${update.id}-${update.timestamp}`} style={styles.updateRow}>
                 <View>
-                  <Text style={{ fontWeight: "700" }}>{loc.displayName}</Text>
+                  <Text style={{ fontWeight: "700" }}>{formatUserName(update.targetId)}</Text>
                   <Text style={{ color: "#555" }}>
-                    {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
+                    {update.eventType === "departure" ? "Has left" : "Has arrived to"}{" "}
+                    {formatLocationLabel(update)} at {new Date(update.timestamp).toLocaleString()}
                   </Text>
                 </View>
-                <Text style={styles.updateMeta}>
-                  {new Date(loc.updatedAt).toLocaleTimeString()}
-                </Text>
               </View>
             ))}
           </ScrollView>
@@ -503,28 +599,15 @@ const styles = StyleSheet.create({
   },
   countPillText: { color: "#b30059", fontWeight: "700" },
   updatesList: { maxHeight: 240 },
-  topBar: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    right: 10,
-    zIndex: 50,
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    pointerEvents: "box-none",
+  inlineLink: {
+    alignSelf: "flex-start",
+    marginBottom: 8,
   },
-  topButton: {
-    backgroundColor: "#6c5ce7",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+  inlineLinkText: {
+    color: "#6c5ce7",
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
-  topButtonText: { color: "#fff", fontWeight: "700" },
   pinRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -541,7 +624,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-  updateMeta: { color: "#777", fontSize: 12, marginLeft: 12 },
   pinListScroll: {
     marginTop: 8,
     maxHeight: 300,
