@@ -36,6 +36,8 @@ import {
   setSubscriptionEnabled,
 } from "@/services/subscriptionService";
 import { getUserIdFromToken } from "@/utils/jwt";
+import { registerPushToken } from "@/services/pushTokenService";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
 
 export default function Home() {
   const router = useRouter();
@@ -54,6 +56,7 @@ export default function Home() {
   const [subscriptionsFollowers, setSubscriptionsFollowers] = useState<FollowerAccess[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [pushRegistered, setPushRegistered] = useState(false);
 
   const FancyButton = ({
     title,
@@ -226,6 +229,22 @@ export default function Home() {
     loadData();
   }, []);
 
+  // Register push notifications token once we know the user
+  useEffect(() => {
+    if (!currentUserId || pushRegistered) return;
+    const register = async () => {
+      const token = await registerForPushNotificationsAsync();
+      if (!token) return;
+      try {
+        await registerPushToken(currentUserId, token);
+        setPushRegistered(true);
+      } catch (err) {
+        console.warn("Failed to save push token", err);
+      }
+    };
+    register();
+  }, [currentUserId, pushRegistered]);
+
   // Accept / Decline follow request
   const handleRequestAction = async (requestId: string, status: "accepted" | "rejected") => {
     try {
@@ -350,11 +369,9 @@ export default function Home() {
           return [...prev, { ...newSub, canSee: true }];
         });
       } else {
-        const updated = await setSubscriptionEnabled(viewerId, targetId, false);
+        await deleteSubscriptionByUsers(viewerId, targetId);
         setSubscriptionsFollowers((prev) =>
-          prev.map((s) =>
-            s.viewerId === viewerId && s.targetId === targetId ? { ...s, canSee: updated.enabled !== false } : s
-          )
+          prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
         );
       }
     } catch (err: any) {

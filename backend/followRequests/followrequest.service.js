@@ -1,4 +1,5 @@
 const FollowRequest = require("./followrequest.model");
+const pushService = require("../utils/push.service");
 
 async function createFollowRequest(requesterId, targetId) {
   // Prevent duplicate requests
@@ -6,6 +7,15 @@ async function createFollowRequest(requesterId, targetId) {
   if (existing) throw new Error("Follow request already exists");
 
   const request = await FollowRequest.create({ requesterId, targetId });
+  // Fire-and-forget push notification
+  pushService.getUserDisplayName(requesterId).then((name) => {
+    pushService.notifyUser(
+      targetId,
+      "New follow request",
+      `${name} wants to follow you`,
+      { type: "follow-request", requesterId, targetId }
+    );
+  });
   return request;
 }
 

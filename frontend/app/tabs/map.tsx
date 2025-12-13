@@ -5,6 +5,7 @@ import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import MapComponent from "@/components/MapComponent";
+import "@/utils/leafletAssets.css";
 import { getUserIdFromToken } from "@/utils/jwt";
 import { getFollowingLocations, updateLocation, UserLocation } from "@/services/locationService";
 import { createPin, getPins, deletePin, Pin, PinCategory } from "@/services/pinService";

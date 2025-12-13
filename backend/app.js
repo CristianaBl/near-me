@@ -11,6 +11,7 @@ const subscriptionRoutes = require("./subscriptions/subscription.routes");
 const locationRoutes = require("./locations/location.routes");
 const pinRoutes = require("./pins/pin.routes");
 const arrivalWatchRoutes = require("./arrivalWatches/arrivalWatch.routes");
+const pushTokenRoutes = require("./pushTokens/pushToken.routes");
 
 const app = express();
 const server = http.createServer(app);
@@ -48,6 +49,7 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/pins", pinRoutes);
 app.use("/api/arrival-watches", arrivalWatchRoutes);
+app.use("/api/push-tokens", pushTokenRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;

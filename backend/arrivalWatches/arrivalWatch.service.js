@@ -1,6 +1,7 @@
 const ArrivalWatch = require("./arrivalWatch.model");
 const Pin = require("../pins/pin.model");
 const Location = require("../locations/location.model");
+const pushService = require("../utils/push.service");
 
 let ensuredIndexFix = false;
 async function ensureLegacyIndexDropped() {
@@ -104,6 +105,7 @@ function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
 async function processArrivalWatches(targetId, latitude, longitude, io) {
   if (!io) return;
   const watches = await findWatchesForTarget(targetId);
+  const targetName = await pushService.getUserDisplayName(targetId);
   const viewerLocIds = Array.from(
     new Set(
       watches
@@ -153,6 +155,15 @@ async function processArrivalWatches(targetId, latitude, longitude, io) {
         payload.pinLng = anchorLng;
       }
       io.to(String(w.viewerId)).emit("arrival-triggered", payload);
+      const pinLabel = w.useViewerLocation
+        ? "near you"
+        : w.pinId?.title || w.pinId?.category || "your pin";
+      pushService.notifyUser(
+        String(w.viewerId),
+        w.eventType === "arrival" ? "Arrival alert" : "Departure alert",
+        `${targetName} ${w.eventType === "arrival" ? "arrived" : "left"} ${pinLabel}`,
+        { type: "arrival-watch", watchId: String(w._id), targetId, pinId: payload.pinId }
+      );
     }
 
     const newInside = inside;
@@ -170,6 +181,10 @@ async function processViewerLocationWatches(viewerId, latitude, longitude, io) {
 
   const targetIds = Array.from(new Set(watches.map((w) => String(w.targetId))));
   const targetLocations = await Location.find({ userId: { $in: targetIds } });
+  const targetNames = new Map();
+  for (const tId of targetIds) {
+    targetNames.set(tId, await pushService.getUserDisplayName(tId));
+  }
   const targetLocMap = new Map(targetLocations.map((l) => [String(l.userId), l]));
 
   for (const w of watches) {
@@ -197,6 +212,13 @@ async function processViewerLocationWatches(viewerId, latitude, longitude, io) {
         eventType: w.eventType,
         useViewerLocation: true,
       });
+      const label = targetNames.get(String(w.targetId)) || "Someone";
+      pushService.notifyUser(
+        String(w.viewerId),
+        w.eventType === "arrival" ? "Arrival alert" : "Departure alert",
+        `${label} ${w.eventType === "arrival" ? "is near you" : "left your proximity"}`,
+        { type: "arrival-watch", watchId: String(w._id), targetId: String(w.targetId) }
+      );
     }
 
     const newInside = inside;
