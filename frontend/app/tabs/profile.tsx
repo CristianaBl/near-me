@@ -32,6 +32,7 @@ export default function ProfileScreen() {
   const [pushToken, setPushToken] = useState<string | null>(null);
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const isWeb = Platform.OS === "web";
 
   useEffect(() => {
     async function loadUser() {
@@ -73,6 +74,11 @@ export default function ProfileScreen() {
   const handleTogglePush = async (enable: boolean) => {
     if (!userId) return;
     if (enable) {
+      if (isWeb) {
+        Alert.alert("Not available on web", "Push notifications require a VAPID key. Please use the mobile app.");
+        setPushEnabled(false);
+        return;
+      }
       const token = await registerForPushNotificationsAsync();
       if (!token) {
         setPushEnabled(false);
@@ -117,13 +123,18 @@ export default function ProfileScreen() {
         <View style={styles.cardRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.label}>Push notifications</Text>
-            <Text style={styles.helper}>Enable alerts before editing the rest of your profile.</Text>
+            <Text style={styles.helper}>
+              {isWeb
+                ? "Push alerts require mobile or a VAPID web key."
+                : "Enable alerts before editing the rest of your profile."}
+            </Text>
           </View>
           <Switch
             value={pushEnabled}
             onValueChange={handleTogglePush}
             thumbColor={pushEnabled ? "#ff7eb6" : "#f1d4e3"}
             trackColor={{ true: "#ffd6ec", false: "#e7d5df" }}
+            disabled={isWeb}
           />
         </View>
 
