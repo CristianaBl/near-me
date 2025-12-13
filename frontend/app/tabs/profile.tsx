@@ -1,10 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, ScrollView, Dimensions } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+  Switch,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
 import { getUserById, updateUser } from "@/services/userService";
 import { getUserIdFromToken } from "@/utils/jwt";
+import { registerPushToken, removePushToken } from "@/services/pushTokenService";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
 
 export default function ProfileScreen() {
   const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -14,6 +28,8 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState<string>("");
   const [firstName, setFirstName] = useState<string>("");
   const [lastName, setLastName] = useState<string>("");
+  const [pushEnabled, setPushEnabled] = useState<boolean>(false);
+  const [pushToken, setPushToken] = useState<string | null>(null);
 
   const [isEditing, setIsEditing] = useState<boolean>(false);
 
@@ -54,60 +70,113 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleTogglePush = async (enable: boolean) => {
+    if (!userId) return;
+    if (enable) {
+      const token = await registerForPushNotificationsAsync();
+      if (!token) {
+        setPushEnabled(false);
+        return;
+      }
+      try {
+        await registerPushToken(userId, token);
+        setPushToken(token);
+        setPushEnabled(true);
+      } catch (err: any) {
+        Alert.alert("Error", err.message || "Failed to enable push notifications");
+      }
+    } else {
+      if (pushToken) {
+        try {
+          await removePushToken(pushToken);
+        } catch {
+          // ignore remove errors
+        }
+      }
+      setPushEnabled(false);
+    }
+  };
+
   const logout = async () => {
     await AsyncStorage.clear();
     router.replace("/login");
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { minHeight: SCREEN_HEIGHT * 0.9, paddingBottom: 40 }]}>
-      <View style={styles.ribbonOne} />
-      <View style={styles.ribbonTwo} />
-      <Text style={styles.header}>My Profile</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1, backgroundColor: "#fff0f6" }}
+    >
+      <ScrollView contentContainerStyle={[styles.container, { minHeight: SCREEN_HEIGHT * 0.9, paddingBottom: 50 }]}>
+        <View style={styles.ribbonOne} />
+        <View style={styles.ribbonTwo} />
+        <Text style={styles.logo}>nearMe</Text>
+        <Text style={styles.header}>My Profile</Text>
 
-      {/* EMAIL */}
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={[styles.input, !isEditing && styles.disabled]}
-        editable={isEditing}
-        value={email}
-        onChangeText={setEmail}
-      />
+        {/* PUSH NOTIFICATIONS */}
+        <View style={styles.cardRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Push notifications</Text>
+            <Text style={styles.helper}>Enable alerts before editing the rest of your profile.</Text>
+          </View>
+          <Switch
+            value={pushEnabled}
+            onValueChange={handleTogglePush}
+            thumbColor={pushEnabled ? "#ff7eb6" : "#f1d4e3"}
+            trackColor={{ true: "#ffd6ec", false: "#e7d5df" }}
+          />
+        </View>
 
-      {/* FIRST NAME */}
-      <Text style={styles.label}>First Name</Text>
-      <TextInput
-        style={[styles.input, !isEditing && styles.disabled]}
-        editable={isEditing}
-        value={firstName}
-        onChangeText={setFirstName}
-      />
+        {/* EMAIL */}
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={[styles.input, !isEditing && styles.disabled]}
+          editable={isEditing}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor="#c48bae"
+        />
 
-      {/* LAST NAME */}
-      <Text style={styles.label}>Last Name</Text>
-      <TextInput
-        style={[styles.input, !isEditing && styles.disabled]}
-        editable={isEditing}
-        value={lastName}
-        onChangeText={setLastName}
-      />
+        {/* FIRST NAME */}
+        <Text style={styles.label}>First Name</Text>
+        <TextInput
+          style={[styles.input, !isEditing && styles.disabled]}
+          editable={isEditing}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="Ava"
+          placeholderTextColor="#c48bae"
+        />
 
-      {/* BUTTONS */}
-      <View style={styles.buttonContainer}>
-        {!isEditing ? (
-          <FancyButton title="Edit Profile" onPress={() => setIsEditing(true)} />
-        ) : (
-          <>
-            <FancyButton title="Save Changes" onPress={handleSave} />
-            <View style={{ height: 10 }} />
-            <FancyButton title="Cancel" color="#b2bec3" textColor="#2d3436" onPress={() => setIsEditing(false)} />
-          </>
-        )}
+        {/* LAST NAME */}
+        <Text style={styles.label}>Last Name</Text>
+        <TextInput
+          style={[styles.input, !isEditing && styles.disabled]}
+          editable={isEditing}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Bloom"
+          placeholderTextColor="#c48bae"
+        />
 
-        <View style={{ height: 20 }} />
-        <FancyButton title="Logout" color="#ff6f61" onPress={logout} />
-      </View>
-    </ScrollView>
+        {/* BUTTONS */}
+        <View style={styles.buttonContainer}>
+          {!isEditing ? (
+            <FancyButton title="Edit Profile" onPress={() => setIsEditing(true)} />
+          ) : (
+            <>
+              <FancyButton title="Save Changes" onPress={handleSave} />
+              <View style={{ height: 10 }} />
+              <FancyButton title="Cancel" color="#b2bec3" textColor="#2d3436" onPress={() => setIsEditing(false)} />
+            </>
+          )}
+
+          <View style={{ height: 20 }} />
+          <FancyButton title="Logout" color="#ff6f61" onPress={logout} />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -142,12 +211,42 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     position: "relative",
   },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    shadowColor: "#ff99c8",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
+    marginTop: 12,
+  },
+  helper: {
+    color: "#a45b7a",
+    marginTop: 4,
+    maxWidth: 220,
+  },
   header: {
     fontSize: 30,
     fontWeight: "800",
     marginBottom: 20,
     textAlign: "center",
     color: "#b30059",
+  },
+  logo: {
+    alignSelf: "center",
+    backgroundColor: "#ff7eb6",
+    color: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   label: {
     fontSize: 15,

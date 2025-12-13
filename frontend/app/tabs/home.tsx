@@ -353,6 +353,18 @@ export default function Home() {
     }
   };
 
+  const openFollowerActions = (viewerId: string) => {
+    const found = users.find((u) => u.id === viewerId);
+    const fallback: User = {
+      id: viewerId,
+      email: getEmailById(viewerId) || "User",
+      firstName: "",
+      lastName: "",
+    } as User;
+    setSelectedUser(found || fallback);
+    setUserActionModalVisible(true);
+  };
+
   const toggleViewerAccess = async (viewerId: string, enable: boolean) => {
     const targetId = await ensureUserId();
     if (!targetId) return;
@@ -553,29 +565,22 @@ export default function Home() {
               ) : (
                 subscriptionsFollowers.map((item) => (
                   <View key={item.id} style={[styles.listRow, styles.listRowActions]}>
-                    <Text>{getEmailById(item.viewerId)}</Text>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      {!isFollowingUser(item.viewerId) && !getPendingRequest(item.viewerId) && (
-                        <FancyButton
-                          title="Follow back"
-                          color="#7ed957"
-                          onPress={() => handleFollowBack(item.viewerId)}
-                        />
-                      )}
-                      <FancyButton
-                        title="Revoke"
-                        color="#d9534f"
-                        onPress={() => toggleViewerAccess(item.viewerId, false)}
+                    <TouchableOpacity
+                      onPress={() => openFollowerActions(item.viewerId)}
+                      style={{ flex: 1 }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.profileLink}>{getEmailById(item.viewerId)}</Text>
+                      <Text style={styles.muted}>Tap for follow back or revoke</Text>
+                    </TouchableOpacity>
+                    <View style={{ alignItems: "center" }}>
+                      <Text style={styles.muted}>Allow location</Text>
+                      <Switch
+                        value={item.canSee !== false}
+                        onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
+                        thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
+                        trackColor={{ true: "#ffd6ec", false: "#ddd" }}
                       />
-                      <View style={{ alignItems: "center" }}>
-                        <Text style={styles.muted}>Allow location</Text>
-                        <Switch
-                          value={item.canSee !== false}
-                          onValueChange={(value) => toggleViewerAccess(item.viewerId, value)}
-                          thumbColor={item.canSee !== false ? "#ff7eb6" : "#ccc"}
-                          trackColor={{ true: "#ffd6ec", false: "#ddd" }}
-                        />
-                      </View>
                     </View>
                   </View>
                 ))
@@ -660,6 +665,19 @@ export default function Home() {
                 }
               }}
             />
+            {!selectedUser ? null : !isFollowingUser(selectedUser.id) && !getPendingRequest(selectedUser.id) ? (
+              <>
+                <View style={{ height: 10 }} />
+                <FancyButton
+                  title="Follow back"
+                  color="#7ed957"
+                  onPress={async () => {
+                    await handleFollowBack(selectedUser.id);
+                    setUserActionModalVisible(false);
+                  }}
+                />
+              </>
+            ) : null}
             <View style={{ height: 10 }} />
             <FancyButton title="Close" color="#6c5ce7" onPress={() => setUserActionModalVisible(false)} />
           </View>

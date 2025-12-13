@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -11,6 +11,12 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotificationsAsync() {
   try {
+    if (Platform.OS === "web") {
+      // Expo web push requires VAPID configuration; skip and let caller handle.
+      Alert.alert("Not available on web", "Push notifications require a VAPID key. Please use the mobile app.");
+      return null;
+    }
+
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== "granted") {

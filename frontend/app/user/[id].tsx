@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform, TextInput } from "react-native";
+import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform, TextInput, ScrollView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -220,127 +221,170 @@ export default function UserDetail() {
       : { label: "Follow", action: handleFollow };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Text style={styles.backText}>Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.header}>{targetEmail || "User"}</Text>
-
-      <View style={styles.row}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={followButton.action}>
-          <Text style={styles.btnText}>{followButton.label}</Text>
-        </TouchableOpacity>
-        {isFollower && !isFollowing && (
-          <TouchableOpacity style={styles.secondaryBtn} onPress={handleFollowBack}>
-            <Text style={styles.btnText}>Follow back</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <Text style={styles.sectionTitle}>Arrival/Departure alerts</Text>
-      <Text style={styles.caption}>Get notified when {targetEmail || "they"} arrive at or leave one of your pins or near you.</Text>
-
-      <Text style={styles.subheading}>Add alert</Text>
-      <View style={styles.pickerRow}>
-        <View style={styles.pillToggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, selectedEventType === "arrival" && styles.toggleBtnActive]}
-            onPress={() => setSelectedEventType("arrival")}
-          >
-            <Text style={[styles.toggleText, selectedEventType === "arrival" && styles.toggleTextActive]}>
-              Arrival
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, selectedEventType === "departure" && styles.toggleBtnActive]}
-            onPress={() => setSelectedEventType("departure")}
-          >
-            <Text style={[styles.toggleText, selectedEventType === "departure" && styles.toggleTextActive]}>
-              Departure
-            </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff0f6" }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.ribbonOne} />
+        <View style={styles.ribbonTwo} />
+        <View style={styles.headerRow}>
+          <Text style={styles.logo}>nearMe</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={10}>
+            <Text style={styles.closeText}>×</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.selectBox}>
-          <View style={styles.dropdownContainer}>
-            <TouchableOpacity
-              style={styles.dropdownHeader}
-              onPress={() => setShowDropdown((prev) => !prev)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.dropdownLabel}>{selectedOption?.label || "Choose a location"}</Text>
-              <Text style={styles.dropdownCaret}>{showDropdown ? "▲" : "▼"}</Text>
+        <Text style={styles.header}>{targetEmail || "User"}</Text>
+
+        <View style={[styles.card, { marginBottom: 14 }]}>
+          <View style={styles.row}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={followButton.action}>
+              <Text style={styles.btnText}>{followButton.label}</Text>
             </TouchableOpacity>
-            {showDropdown && (
-              <View style={styles.dropdownList}>
-                {pinOptions.map((option) => {
-                  const active = selectedPinId === option.id;
-                  return (
-                    <TouchableOpacity
-                      key={option.id}
-                      style={[styles.dropdownItem, active && styles.selectItemActive]}
-                      onPress={() => {
-                        setSelectedPinId(option.id);
-                        setShowDropdown(false);
-                      }}
-                    >
-                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {pins.length === 0 && (
-                  <Text style={[styles.caption, { marginTop: 4 }]}>No pins saved yet.</Text>
-                )}
-              </View>
+            {isFollower && !isFollowing && (
+              <TouchableOpacity style={styles.secondaryBtn} onPress={handleFollowBack}>
+                <Text style={styles.btnText}>Follow back</Text>
+              </TouchableOpacity>
             )}
           </View>
+          <Text style={styles.sectionTitle}>Arrival/Departure alerts</Text>
+          <Text style={styles.caption}>Get notified when {targetEmail || "they"} arrive at or leave one of your pins or near you.</Text>
         </View>
-      </View>
-      <View style={styles.radiusRow}>
-        <Text style={styles.caption}>Radius in meters (default 200)</Text>
-        <TextInput
-          style={styles.radiusInput}
-          keyboardType="numeric"
-          value={radiusInput}
-          onChangeText={setRadiusInput}
-          onBlur={() => setRadiusInput(String(sanitizeRadius(radiusInput)))}
-          placeholder="200"
-          placeholderTextColor="#888"
-        />
-      </View>
-      <TouchableOpacity
-        style={[
-          styles.primaryBtn,
-          { marginTop: 8, opacity: selectedPinId ? 1 : 0.5 },
-        ]}
-        disabled={!selectedPinId}
-        onPress={handleCreateWatch}
-      >
-        <Text style={styles.btnText}>Add alert</Text>
-      </TouchableOpacity>
 
-      <Text style={styles.subheading}>Active alerts</Text>
-      <FlatList
-        data={watches}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.listRow}>
-            <Text>{item.pinLabel} ({item.eventType}) radius {item.radius}m</Text>
-            <TouchableOpacity onPress={() => handleDeleteWatch(item.id)}>
-              <Text style={{ color: "#ff6f61" }}>Delete</Text>
-            </TouchableOpacity>
+        <View style={styles.card}>
+          <Text style={styles.subheading}>Add alert</Text>
+          <View style={styles.pickerRow}>
+            <View style={styles.pillToggle}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, selectedEventType === "arrival" && styles.toggleBtnActive]}
+                onPress={() => setSelectedEventType("arrival")}
+              >
+                <Text style={[styles.toggleText, selectedEventType === "arrival" && styles.toggleTextActive]}>
+                  Arrival
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, selectedEventType === "departure" && styles.toggleBtnActive]}
+                onPress={() => setSelectedEventType("departure")}
+              >
+                <Text style={[styles.toggleText, selectedEventType === "departure" && styles.toggleTextActive]}>
+                  Departure
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.selectBox}>
+              <View style={styles.dropdownContainer}>
+                <TouchableOpacity
+                  style={styles.dropdownHeader}
+                  onPress={() => setShowDropdown((prev) => !prev)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.dropdownLabel}>{selectedOption?.label || "Choose a location"}</Text>
+                  <Text style={styles.dropdownCaret}>{showDropdown ? "▲" : "▼"}</Text>
+                </TouchableOpacity>
+                {showDropdown && (
+                  <View style={styles.dropdownList}>
+                    {pinOptions.map((option) => {
+                      const active = selectedPinId === option.id;
+                      return (
+                        <TouchableOpacity
+                          key={option.id}
+                          style={[styles.dropdownItem, active && styles.selectItemActive]}
+                          onPress={() => {
+                            setSelectedPinId(option.id);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {pins.length === 0 && (
+                      <Text style={[styles.caption, { marginTop: 4 }]}>No pins saved yet.</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-        )}
-        ListEmptyComponent={<Text style={styles.caption}>No active alerts.</Text>}
-      />
+          <View style={styles.radiusRow}>
+            <Text style={styles.caption}>Radius in meters (default 200)</Text>
+            <TextInput
+              style={styles.radiusInput}
+              keyboardType="numeric"
+              value={radiusInput}
+              onChangeText={setRadiusInput}
+              onBlur={() => setRadiusInput(String(sanitizeRadius(radiusInput)))}
+              placeholder="200"
+              placeholderTextColor="#c48bae"
+            />
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.primaryBtn,
+              { marginTop: 8, opacity: selectedPinId ? 1 : 0.5 },
+            ]}
+            disabled={!selectedPinId}
+            onPress={handleCreateWatch}
+          >
+            <Text style={styles.btnText}>Add alert</Text>
+          </TouchableOpacity>
+        </View>
 
-    </View>
+        <View style={styles.card}>
+          <Text style={styles.subheading}>Active alerts</Text>
+          <FlatList
+            data={watches}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.listRow}>
+                <View>
+                  <Text style={styles.listPrimary}>{item.pinLabel}</Text>
+                  <Text style={styles.caption}>{item.eventType} • {item.radius}m</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleDeleteWatch(item.id)}>
+                  <Text style={{ color: "#ff6f61", fontWeight: "700" }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            ListEmptyComponent={<Text style={styles.caption}>No active alerts.</Text>}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, paddingTop: 60 },
+  container: {
+    flexGrow: 1,
+    padding: 18,
+    paddingTop: 60,
+    backgroundColor: "#fff0f6",
+    gap: 8,
+  },
+  ribbonOne: {
+    position: "absolute",
+    top: -60,
+    right: -80,
+    width: 260,
+    height: 260,
+    backgroundColor: "#ffd6ec",
+    borderRadius: 140,
+    opacity: 0.9,
+    transform: [{ rotate: "-10deg" }],
+  },
+  ribbonTwo: {
+    position: "absolute",
+    bottom: -70,
+    left: -60,
+    width: 240,
+    height: 240,
+    backgroundColor: "#ffe8f3",
+    borderRadius: 140,
+    opacity: 0.7,
+    transform: [{ rotate: "14deg" }],
+  },
   backBtn: {
     alignSelf: "flex-start",
     paddingVertical: 6,
@@ -350,29 +394,85 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backText: { color: "#333", fontWeight: "600" },
-  header: { fontSize: 24, fontWeight: "800", marginBottom: 12, color: "#b30059" },
+  logo: {
+    alignSelf: "flex-start",
+    backgroundColor: "#ff7eb6",
+    color: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#ffd6ec",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeText: { color: "#b30059", fontSize: 20, fontWeight: "800" },
+  header: { fontSize: 26, fontWeight: "800", marginBottom: 12, color: "#b30059" },
   row: { flexDirection: "row", gap: 12, marginBottom: 16 },
-  primaryBtn: { backgroundColor: "#ff7eb6", padding: 10, borderRadius: 10 },
-  secondaryBtn: { backgroundColor: "#6c5ce7", padding: 10, borderRadius: 10 },
+  primaryBtn: {
+    backgroundColor: "#ff7eb6",
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: "#ff99c8",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  secondaryBtn: {
+    backgroundColor: "#6c5ce7",
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: "#c4a1ff",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
   btnText: { color: "#fff", fontWeight: "700" },
-  sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
-  caption: { color: "#555", marginBottom: 6 },
-  subheading: { fontWeight: "700", marginTop: 12, marginBottom: 6 },
+  sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6, color: "#b30059" },
+  caption: { color: "#7a5a71", marginBottom: 6 },
+  subheading: { fontWeight: "700", marginTop: 12, marginBottom: 6, color: "#8a4f6b" },
+  listPrimary: { color: "#3b1c2a", fontWeight: "700" },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 14,
+    shadowColor: "#ff99c8",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 2,
+    marginBottom: 12,
+  },
   radiusRow: { marginVertical: 8 },
   radiusInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 8,
+    borderColor: "#ffc2dd",
+    borderRadius: 12,
+    padding: 12,
     marginTop: 4,
     minWidth: 120,
-    backgroundColor: "#fff",
+    backgroundColor: "#fff7fb",
+    color: "#3b1c2a",
   },
   radiusBtn: { paddingHorizontal: 12, alignSelf: "flex-end" },
   listRow: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f4d1e6",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -384,16 +484,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 4,
   },
-  toggleBtn: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 10 },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 10 },
   toggleBtnActive: { backgroundColor: "#6c5ce7" },
   toggleText: { color: "#6c5ce7", fontWeight: "700" },
   toggleTextActive: { color: "#fff" },
   selectBox: {
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
+    borderColor: "#ffc2dd",
+    borderRadius: 12,
     padding: 6,
-    backgroundColor: "#fafafa",
+    backgroundColor: "#fff",
     maxHeight: 200,
   },
   selectItem: {
@@ -401,17 +501,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: "#fff",
+    backgroundColor: "#fff7fb",
     borderWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#ffd6ec",
   },
   selectItemActive: {
-    backgroundColor: "#6c5ce7",
-    borderColor: "#6c5ce7",
+    backgroundColor: "#ff7eb6",
+    borderColor: "#ff7eb6",
   },
   dropdownContainer: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#ffc2dd",
     borderRadius: 12,
     backgroundColor: "#fff",
     overflow: "hidden",
@@ -424,18 +524,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: "#f3e9f7",
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#ffd6ec",
   },
   dropdownLabel: { color: "#333", fontWeight: "700", flex: 1 },
   dropdownCaret: { color: "#6c5ce7", fontWeight: "800", marginLeft: 8 },
-  dropdownList: { paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
+  dropdownList: { paddingHorizontal: 8, paddingVertical: 6, gap: 6, backgroundColor: "#fff" },
   dropdownItem: {
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 10,
-    backgroundColor: "#fafafa",
+    backgroundColor: "#fff7fb",
     borderWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#ffd6ec",
   },
   dropdownItemText: { color: "#333", fontWeight: "600" },
   dropdownItemTextActive: { color: "#fff" },
