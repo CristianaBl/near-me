@@ -2,8 +2,15 @@ const arrivalWatchService = require("./arrivalWatch.service");
 
 async function create(req, res) {
   try {
-    const { viewerId, targetId, pinId, radiusMeters, eventType } = req.body;
-    const watch = await arrivalWatchService.createWatch(viewerId, targetId, pinId, radiusMeters, eventType);
+    const { viewerId, targetId, pinId, radiusMeters, eventType, useViewerLocation } = req.body;
+    const watch = await arrivalWatchService.createWatch(
+      viewerId,
+      targetId,
+      pinId,
+      radiusMeters,
+      eventType,
+      useViewerLocation
+    );
     res.status(201).json({ watch });
   } catch (err) {
     res.status(400).json({ message: err.message });

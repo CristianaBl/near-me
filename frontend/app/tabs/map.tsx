@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Platform, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Platform, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView, TextInput } from "react-native";
 import { io } from "socket.io-client";
 import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -48,6 +48,7 @@ export default function MapScreen() {
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinListVisible, setPinListVisible] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [customPinName, setCustomPinName] = useState("");
   const [arrivalUpdates, setArrivalUpdates] = useState<ArrivalUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -281,7 +282,7 @@ export default function MapScreen() {
 
     const myPins = pins.map((p) => ({
       id: `pin-${p.id}`,
-      title: `${CATEGORY_EMOJI[p.category]} ${p.category}`,
+      title: `${CATEGORY_EMOJI[p.category]} ${p.title || p.category}`,
       description: p.title || "Saved place",
       latitude: p.latitude,
       longitude: p.longitude,
@@ -319,7 +320,7 @@ export default function MapScreen() {
         `pin-${p.id}` === update.pinId ||
         String(p.id) === update.pinId
     );
-    if (pinMatch) return `${CATEGORY_EMOJI[pinMatch.category]} ${pinMatch.category}`;
+    if (pinMatch) return `${CATEGORY_EMOJI[pinMatch.category]} ${pinMatch.title || pinMatch.category}`;
     if (typeof update.pinLat === "number" && typeof update.pinLng === "number") {
       return `${update.pinLat.toFixed(5)}, ${update.pinLng.toFixed(5)}`;
     }
@@ -334,16 +335,21 @@ export default function MapScreen() {
     return id;
   };
 
-  const handleAddPin = async (category: PinCategory) => {
+  const handleAddPin = async (category: PinCategory, title?: string) => {
     const userId = await ensureUserId();
     if (!pendingCoord || !userId) return;
+    const trimmedTitle = title?.trim();
+    if (category === "other" && !trimmedTitle) {
+      Alert.alert("Name required", "Please enter a name for your custom pin.");
+      return;
+    }
     try {
       const pin = await createPin(
         userId,
         category,
         pendingCoord.lat,
         pendingCoord.lng,
-        undefined
+        trimmedTitle
       );
       setPins((prev) => [pin, ...prev]);
       setNetworkError(null);
@@ -490,7 +496,7 @@ export default function MapScreen() {
                 {pins.map((pin) => (
                   <View key={pin.id} style={styles.pinRow}>
                     <View>
-                      <Text style={{ fontWeight: "700" }}>{CATEGORY_EMOJI[pin.category]} {pin.category}</Text>
+                      <Text style={{ fontWeight: "700" }}>{CATEGORY_EMOJI[pin.category]} {pin.title || pin.category}</Text>
                       <Text style={{ color: "#555" }}>
                         {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}
                       </Text>
@@ -515,7 +521,7 @@ export default function MapScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Save this place as</Text>
             <View style={styles.chipColumn}>
-              {(["home", "work", "school", "church", "restaurant", "other"] as PinCategory[]).map((cat) => (
+              {(["home", "work", "school", "church", "restaurant"] as PinCategory[]).map((cat) => (
                 <TouchableOpacity
                   key={cat}
                   style={styles.chip}
@@ -524,6 +530,24 @@ export default function MapScreen() {
                   <Text style={styles.chipText}>{CATEGORY_EMOJI[cat]} {cat}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <Text style={{ fontWeight: "700", marginBottom: 6 }}>Custom name</Text>
+              <TextInput
+                style={styles.customInput}
+                placeholder="e.g., Grandma's house"
+                value={customPinName}
+                onChangeText={setCustomPinName}
+              />
+              <TouchableOpacity
+                style={[styles.chip, styles.customSave]}
+                onPress={() => {
+                  handleAddPin("other", customPinName);
+                  setCustomPinName("");
+                }}
+              >
+                <Text style={[styles.chipText, styles.customSaveText]}>📍 Save custom pin</Text>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.modalClose} onPress={() => setPinModalVisible(false)}>
               <Text style={styles.modalCloseText}>Cancel</Text>
@@ -573,6 +597,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffe6f2",
   },
   chipText: { color: "#b30059", fontWeight: "600" },
+  customInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: "#fff",
+    marginBottom: 8,
+  },
+  customSave: {
+    backgroundColor: "#b30059",
+  },
+  customSaveText: { color: "#fff" },
   modalClose: { alignSelf: "flex-end", paddingVertical: 6, paddingHorizontal: 8 },
   modalCloseText: { color: "#ff6f61", fontWeight: "600" },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginTop: 8 },

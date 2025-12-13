@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, Alert, TouchableOpacity, FlatList, Platform, TextInput } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { createArrivalWatch, deleteArrivalWatch, listArrivalWatches } from "@/services/arrivalWatchService";
 import { getUserById } from "@/services/userService";
 import { getSubscriptionsForViewer, getSubscriptionsForTarget, createSubscription, deleteSubscriptionByUsers } from "@/services/subscriptionService";
 import { createFollowRequest, getFollowRequestsSentByUser, deleteFollowRequest } from "@/services/followRequestService";
@@ -11,13 +12,15 @@ import { getUserIdFromToken } from "@/utils/jwt";
 
 type Watch = {
   id: string;
-  pinId: string;
+  pinId: string | null;
   pinLabel: string;
   radius: number;
   eventType: "arrival" | "departure";
+  targetId: string;
+  useViewerLocation?: boolean;
 };
 
-import { createArrivalWatch, deleteArrivalWatch, listArrivalWatches } from "@/services/arrivalWatchService";
+const NEAR_ME_ID = "near-me";
 
 export default function UserDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,7 +35,9 @@ export default function UserDetail() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [watches, setWatches] = useState<Watch[]>([]);
   const [selectedEventType, setSelectedEventType] = useState<"arrival" | "departure">("arrival");
-  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [selectedPinId, setSelectedPinId] = useState<string>(NEAR_ME_ID);
+  const [radiusInput, setRadiusInput] = useState<string>("200");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -62,20 +67,61 @@ export default function UserDetail() {
       setPending(sent?.some((r) => r.targetId === tid && r.status === "pending") || false);
       setIsFollowing(following?.some((s) => s.targetId === tid) || false);
       setIsFollower(followers?.some((s) => s.viewerId === tid) || false);
-      setPins(myPins || []);
-      setWatches(
-        (myWatches?.map((w: any) => ({
-          id: w.id ?? w._id ?? w.id,
-          pinId: w.pinId?._id || w.pinId,
-          pinLabel: w.pinId?.category ? `${w.pinId.category}` : "Pin",
-          radius: w.radiusMeters ?? w.radius ?? 100,
-          eventType: w.eventType ?? "arrival",
-        })) as Watch[]) || []
-      );
+      const pinsList = myPins || [];
+      setPins(pinsList);
+      setSelectedPinId((prev) => {
+        if (prev !== NEAR_ME_ID && pinsList.some((p) => p.id === prev)) return prev;
+        return pinsList.length ? pinsList[0].id : NEAR_ME_ID;
+      });
+      const mappedWatches =
+        (myWatches?.map((w: any) => {
+          const pinObj = w.pinId && typeof w.pinId === "object" ? w.pinId : undefined;
+          const targetObj = w.targetId && typeof w.targetId === "object" ? w.targetId : undefined;
+          return {
+            id: String(w.id ?? w._id ?? w.watchId ?? `${targetObj?._id || w.targetId}-${w.eventType ?? "arrival"}`),
+            pinId: pinObj?._id ? String(pinObj._id) : w.pinId ? String(w.pinId) : null,
+            pinLabel: w.useViewerLocation
+              ? "Near you"
+              : pinObj?.title
+                ? pinObj.title
+                : pinObj?.category
+                  ? `${pinObj.category}`
+                  : "Pin",
+            radius: w.radiusMeters ?? w.radius ?? 200,
+            eventType: w.eventType === "departure" ? "departure" : "arrival",
+            targetId: targetObj?._id ? String(targetObj._id) : String(w.targetId),
+            useViewerLocation: !!w.useViewerLocation,
+          } as Watch;
+        }) as Watch[]) || [];
+      const relevantWatches = mappedWatches.filter((w) => w.targetId === tid);
+      setWatches(relevantWatches);
+
+      const proximityWatch = relevantWatches.find((w) => w.useViewerLocation);
+      if (proximityWatch) {
+        setSelectedPinId(NEAR_ME_ID);
+        setRadiusInput(String(proximityWatch.radius ?? "200"));
+      } else {
+        setRadiusInput("200");
+      }
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to load user");
     }
   };
+
+  const sanitizeRadius = (raw: string) => {
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 200;
+  };
+
+  const pinOptions = [
+    { id: NEAR_ME_ID, label: "Near me (uses your current location)" },
+    ...pins.map((pin) => ({
+      id: pin.id,
+      label: `${pin.title || pin.category} (${pin.latitude.toFixed(4)}, ${pin.longitude.toFixed(4)})`,
+    })),
+  ];
+
+  const selectedOption = pinOptions.find((opt) => opt.id === selectedPinId) || pinOptions[0];
 
   const handleFollow = async () => {
     try {
@@ -135,14 +181,14 @@ export default function UserDetail() {
 
   const handleCreateWatch = async () => {
     if (!currentUserId || !targetId) return;
-    if (!selectedPinId) {
-      Alert.alert("Select a pin", "Please choose a pin to watch.");
-      return;
-    }
     try {
-      await createArrivalWatch(currentUserId, targetId, selectedPinId, 100, selectedEventType);
+      const radius = sanitizeRadius(radiusInput);
+      const useViewerLocation = selectedPinId === NEAR_ME_ID;
+      const pinId = useViewerLocation ? null : selectedPinId;
+      await createArrivalWatch(currentUserId, targetId, pinId, radius, selectedEventType, useViewerLocation);
       await loadData(currentUserId, targetId);
-      Alert.alert("Watch added", `You will be notified on ${selectedEventType}.`);
+      setRadiusInput(String(radius));
+      Alert.alert("Alert added", `You'll be notified on ${selectedEventType}.`);
     } catch (err: any) {
       Alert.alert("Error", err.message);
     }
@@ -157,7 +203,7 @@ export default function UserDetail() {
             { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
             { text: "Delete", style: "destructive", onPress: () => resolve(true) },
           ]);
-        });
+      });
     if (!confirm) return;
     try {
       await deleteArrivalWatch(watchId, currentUserId);
@@ -167,11 +213,11 @@ export default function UserDetail() {
     }
   };
 
-  const followButton = useMemo(() => {
-    if (isFollowing) return { label: "Unfollow", action: handleUnfollow };
-    if (pending) return { label: "Cancel request", action: handleCancelRequest };
-    return { label: "Follow", action: handleFollow };
-  }, [isFollowing, pending]);
+  const followButton = isFollowing
+    ? { label: "Unfollow", action: handleUnfollow }
+    : pending
+      ? { label: "Cancel request", action: handleCancelRequest }
+      : { label: "Follow", action: handleFollow };
 
   return (
     <View style={styles.container}>
@@ -192,7 +238,7 @@ export default function UserDetail() {
       </View>
 
       <Text style={styles.sectionTitle}>Arrival/Departure alerts</Text>
-      <Text style={styles.caption}>Get notified when {targetEmail || "they"} arrive at or leave one of your saved pins.</Text>
+      <Text style={styles.caption}>Get notified when {targetEmail || "they"} arrive at or leave one of your pins or near you.</Text>
 
       <Text style={styles.subheading}>Add alert</Text>
       <View style={styles.pickerRow}>
@@ -215,27 +261,53 @@ export default function UserDetail() {
           </TouchableOpacity>
         </View>
         <View style={styles.selectBox}>
-          {pins.length === 0 ? (
-            <Text style={styles.caption}>No pins saved yet.</Text>
-          ) : (
-            <ScrollView>
-              {pins.map((pin) => (
-                <TouchableOpacity
-                  key={pin.id}
-                  style={[
-                    styles.selectItem,
-                    selectedPinId === pin.id && styles.selectItemActive,
-                  ]}
-                  onPress={() => setSelectedPinId(pin.id)}
-                >
-                  <Text style={{ color: selectedPinId === pin.id ? "#fff" : "#333" }}>
-                    {pin.category} ({pin.latitude.toFixed(4)}, {pin.longitude.toFixed(4)})
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          <View style={styles.dropdownContainer}>
+            <TouchableOpacity
+              style={styles.dropdownHeader}
+              onPress={() => setShowDropdown((prev) => !prev)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.dropdownLabel}>{selectedOption?.label || "Choose a location"}</Text>
+              <Text style={styles.dropdownCaret}>{showDropdown ? "▲" : "▼"}</Text>
+            </TouchableOpacity>
+            {showDropdown && (
+              <View style={styles.dropdownList}>
+                {pinOptions.map((option) => {
+                  const active = selectedPinId === option.id;
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[styles.dropdownItem, active && styles.selectItemActive]}
+                      onPress={() => {
+                        setSelectedPinId(option.id);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {pins.length === 0 && (
+                  <Text style={[styles.caption, { marginTop: 4 }]}>No pins saved yet.</Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
+      </View>
+      <View style={styles.radiusRow}>
+        <Text style={styles.caption}>Radius in meters (default 200)</Text>
+        <TextInput
+          style={styles.radiusInput}
+          keyboardType="numeric"
+          value={radiusInput}
+          onChangeText={setRadiusInput}
+          onBlur={() => setRadiusInput(String(sanitizeRadius(radiusInput)))}
+          placeholder="200"
+          placeholderTextColor="#888"
+        />
       </View>
       <TouchableOpacity
         style={[
@@ -286,6 +358,17 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
   caption: { color: "#555", marginBottom: 6 },
   subheading: { fontWeight: "700", marginTop: 12, marginBottom: 6 },
+  radiusRow: { marginVertical: 8 },
+  radiusInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 8,
+    marginTop: 4,
+    minWidth: 120,
+    backgroundColor: "#fff",
+  },
+  radiusBtn: { paddingHorizontal: 12, alignSelf: "flex-end" },
   listRow: {
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -326,4 +409,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#6c5ce7",
     borderColor: "#6c5ce7",
   },
+  dropdownContainer: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: "#f3e9f7",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  dropdownLabel: { color: "#333", fontWeight: "700", flex: 1 },
+  dropdownCaret: { color: "#6c5ce7", fontWeight: "800", marginLeft: 8 },
+  dropdownList: { paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: "#fafafa",
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  dropdownItemText: { color: "#333", fontWeight: "600" },
+  dropdownItemTextActive: { color: "#fff" },
 });

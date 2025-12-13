@@ -10,11 +10,18 @@ async function authHeader() {
   };
 }
 
-export async function createArrivalWatch(viewerId: string, targetId: string, pinId: string, radiusMeters: number, eventType: "arrival" | "departure" = "arrival") {
+export async function createArrivalWatch(
+  viewerId: string,
+  targetId: string,
+  pinId: string | null,
+  radiusMeters: number = 200,
+  eventType: "arrival" | "departure" = "arrival",
+  useViewerLocation = false
+) {
   const res = await fetch(`${API_URL}/arrival-watches`, {
     method: "POST",
     headers: await authHeader(),
-    body: JSON.stringify({ viewerId, targetId, pinId, radiusMeters, eventType }),
+    body: JSON.stringify({ viewerId, targetId, pinId, radiusMeters, eventType, useViewerLocation }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to create arrival watch");
