@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Platform, Dimensions, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Platform, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView } from "react-native";
 import * as ExpoLocation from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -29,7 +29,6 @@ const CATEGORY_EMOJI: Record<PinCategory, string> = {
 };
 
 export default function Map() {
-  const SCREEN_HEIGHT = Dimensions.get("window").height;
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [followingLocations, setFollowingLocations] = useState<UserLocation[]>([]);
   const [myLocation, setMyLocation] = useState<ExpoLocation.LocationObject | null>(null);
@@ -213,6 +212,23 @@ export default function Map() {
     return [...me, ...others, ...myPins];
   }, [followingLocations, myLocation, pins]);
 
+  const followingUpdates = useMemo(
+    () =>
+      [...followingLocations]
+        .sort(
+          (a, b) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )
+        .map((loc) => ({
+          ...loc,
+          displayName:
+            loc.email ||
+            [loc.firstName, loc.lastName].filter(Boolean).join(" ").trim() ||
+            "User",
+        })),
+    [followingLocations]
+  );
+
   const ensureUserId = async () => {
     if (currentUserId) return currentUserId;
     const token = await AsyncStorage.getItem("token");
@@ -304,28 +320,59 @@ export default function Map() {
     <SafeAreaView style={[styles.container]}>
       <View style={[styles.topBar, { paddingTop: 50 }]}>
         <TouchableOpacity style={styles.topButton} onPress={() => setPinListVisible(true)}>
-          <Text style={styles.topButtonText}>Details / My Pins ({pins.length})</Text>
+          <Text style={styles.topButtonText}>My Pins ({pins.length})</Text>
         </TouchableOpacity>
       </View>
-      <MapComponent
-        locations={markers}
-        onLongPress={(lat, lng) => handleSelectLocation(lat, lng)}
-        onMapClick={(lat, lng) => {
-          if (isWeb) {
-            handleSelectLocation(lat, lng);
-          }
-        }}
-      />
-      {!markers.length && (
-        <View style={styles.overlay}>
-          <Text style={styles.overlayText}>No live locations yet</Text>
+      <View style={styles.mapSection}>
+        <MapComponent
+          locations={markers}
+          onLongPress={(lat, lng) => handleSelectLocation(lat, lng)}
+          onMapClick={(lat, lng) => {
+            if (isWeb) {
+              handleSelectLocation(lat, lng);
+            }
+          }}
+        />
+        {!markers.length && (
+          <View style={styles.overlay}>
+            <Text style={styles.overlayText}>No live locations yet</Text>
+          </View>
+        )}
+        {networkError && (
+          <View style={[styles.overlay, { backgroundColor: "rgba(200,0,0,0.7)" }]}>
+            <Text style={styles.overlayText}>{networkError}</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.updatesContainer}>
+        <View style={styles.updatesHeader}>
+          <Text style={styles.sectionTitle}>Updates</Text>
+          <View style={styles.countPill}>
+            <Text style={styles.countPillText}>{followingUpdates.length}</Text>
+          </View>
         </View>
-      )}
-      {networkError && (
-        <View style={[styles.overlay, { backgroundColor: "rgba(200,0,0,0.7)" }]}>
-          <Text style={styles.overlayText}>{networkError}</Text>
-        </View>
-      )}
+        {followingUpdates.length === 0 ? (
+          <Text style={{ color: "#555", marginTop: 8 }}>No updates yet.</Text>
+        ) : (
+          <ScrollView style={styles.updatesList}>
+            {followingUpdates.map((loc) => (
+              <View key={loc.id} style={styles.updateRow}>
+                <View>
+                  <Text style={{ fontWeight: "700" }}>{loc.displayName}</Text>
+                  <Text style={{ color: "#555" }}>
+                    {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
+                  </Text>
+                </View>
+                <Text style={styles.updateMeta}>
+                  {new Date(loc.updatedAt).toLocaleTimeString()}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
       <Modal
         visible={pinListVisible}
         transparent
@@ -333,13 +380,13 @@ export default function Map() {
         onRequestClose={() => setPinListVisible(false)}
       >
         <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxHeight: "70%" }]}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={styles.modalTitle}>My Pins</Text>
-                <TouchableOpacity onPress={() => setPinListVisible(false)}>
-                  <Text style={{ color: "#b30059", fontWeight: "700" }}>Close</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={[styles.modalCard, { maxHeight: "75%" }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={styles.modalTitle}>My Pins</Text>
+              <TouchableOpacity onPress={() => setPinListVisible(false)}>
+                <Text style={{ color: "#b30059", fontWeight: "700" }}>Close</Text>
+              </TouchableOpacity>
+            </View>
             {pins.length === 0 ? (
               <Text style={{ color: "#555", marginTop: 8 }}>No saved locations</Text>
             ) : (
@@ -359,9 +406,9 @@ export default function Map() {
                 ))}
               </ScrollView>
             )}
-            </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
       <Modal
         visible={pinModalVisible}
         transparent
@@ -393,7 +440,8 @@ export default function Map() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: "#fff" },
+  mapSection: { flex: 1, minHeight: 280 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   overlay: {
     position: "absolute",
@@ -421,7 +469,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipColumn: { flexDirection: "column", gap: 8 },
   chip: {
     paddingHorizontal: 10,
@@ -432,6 +479,30 @@ const styles = StyleSheet.create({
   chipText: { color: "#b30059", fontWeight: "600" },
   modalClose: { alignSelf: "flex-end", paddingVertical: 6, paddingHorizontal: 8 },
   modalCloseText: { color: "#ff6f61", fontWeight: "600" },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginTop: 8 },
+  updatesContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#f2f2f2",
+    gap: 8,
+  },
+  updatesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  countPill: {
+    minWidth: 28,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#ffe6f2",
+    borderRadius: 999,
+    alignItems: "center",
+  },
+  countPillText: { color: "#b30059", fontWeight: "700" },
+  updatesList: { maxHeight: 240 },
   topBar: {
     position: "absolute",
     top: 10,
@@ -462,6 +533,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
+  updateRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  updateMeta: { color: "#777", fontSize: 12, marginLeft: 12 },
   pinListScroll: {
     marginTop: 8,
     maxHeight: 300,
