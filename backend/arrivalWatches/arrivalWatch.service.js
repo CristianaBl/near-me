@@ -162,7 +162,16 @@ async function processArrivalWatches(targetId, latitude, longitude, io) {
         String(w.viewerId),
         w.eventType === "arrival" ? "Arrival alert" : "Departure alert",
         `${targetName} ${w.eventType === "arrival" ? "arrived" : "left"} ${pinLabel}`,
-        { type: "arrival-watch", watchId: String(w._id), targetId, pinId: payload.pinId }
+        {
+          type: "arrival-watch",
+          watchId: String(w._id),
+          targetId,
+          pinId: payload.pinId,
+          eventType: w.eventType,
+          useViewerLocation: !!w.useViewerLocation,
+          pinLat: !w.useViewerLocation ? anchorLat : undefined,
+          pinLng: !w.useViewerLocation ? anchorLng : undefined,
+        }
       );
     }
 
@@ -217,7 +226,13 @@ async function processViewerLocationWatches(viewerId, latitude, longitude, io) {
         String(w.viewerId),
         w.eventType === "arrival" ? "Arrival alert" : "Departure alert",
         `${label} ${w.eventType === "arrival" ? "is near you" : "left your proximity"}`,
-        { type: "arrival-watch", watchId: String(w._id), targetId: String(w.targetId) }
+        {
+          type: "arrival-watch",
+          watchId: String(w._id),
+          targetId: String(w.targetId),
+          eventType: w.eventType,
+          useViewerLocation: true,
+        }
       );
     }
 

@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Platform, Modal, TouchableOpacity, SafeAreaView, Alert, ScrollView, TextInput } from "react-native";
 import { io } from "socket.io-client";
 import * as ExpoLocation from "expo-location";
+import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import MapComponent from "@/components/MapComponent";
@@ -27,6 +28,7 @@ type ArrivalUpdate = {
   pinId?: string;
   pinLat?: number;
   pinLng?: number;
+  useViewerLocation?: boolean;
   eventType: "arrival" | "departure";
   timestamp: string;
 };
@@ -55,6 +57,20 @@ export default function MapScreen() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const isWeb = Platform.OS === "web";
+
+  const mergeArrivalUpdates = useCallback((incoming: ArrivalUpdate[]) => {
+    if (!incoming?.length) return;
+    setArrivalUpdates((prev) => {
+      const merged = [...incoming, ...prev];
+      const unique = new globalThis.Map<string, ArrivalUpdate>();
+      merged.forEach((u) => {
+        unique.set(`${u.id}-${u.eventType}-${u.timestamp}`, u);
+      });
+      return Array.from(unique.values())
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 50);
+    });
+  }, []);
 
   // Resolve auth and permissions
   useEffect(() => {
@@ -213,29 +229,21 @@ export default function MapScreen() {
                 pinId: pinObj?._id ? String(pinObj._id) : w.pinId ? String(w.pinId) : undefined,
                 pinLat: pinObj?.latitude,
                 pinLng: pinObj?.longitude,
+                useViewerLocation: !!w.useViewerLocation,
                 eventType,
                 timestamp: w.updatedAt || w.createdAt || new Date().toISOString(),
               } as ArrivalUpdate;
             })
             .filter(Boolean) as ArrivalUpdate[];
 
-        setArrivalUpdates((prev) => {
-          const merged = [...seeded, ...prev];
-          const unique = new globalThis.Map<string, ArrivalUpdate>();
-          merged.forEach((u) => {
-            unique.set(`${u.id}-${u.eventType}-${u.timestamp}`, u);
-          });
-          return Array.from(unique.values()).sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
-        });
+        mergeArrivalUpdates(seeded);
       } catch (err) {
         console.error("Failed to load arrival watches", err);
       }
     };
 
     loadWatches();
-  }, [currentUserId]);
+  }, [currentUserId, mergeArrivalUpdates]);
 
   // Live socket updates for arrival/departure events
   useEffect(() => {
@@ -251,25 +259,54 @@ export default function MapScreen() {
         pinId: payload.pinId ? String(payload.pinId) : undefined,
         pinLat: payload.pinLat,
         pinLng: payload.pinLng,
+        useViewerLocation: !!payload.useViewerLocation,
         eventType: payload.eventType === "departure" ? "departure" : "arrival",
         timestamp: new Date().toISOString(),
       };
-      setArrivalUpdates((prev) => {
-        const merged = [update, ...prev];
-        const unique = new globalThis.Map<string, ArrivalUpdate>();
-        merged.forEach((u) => {
-          unique.set(`${u.id}-${u.eventType}-${u.timestamp}`, u);
-        });
-        return Array.from(unique.values()).sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        ).slice(0, 50);
-      });
+      mergeArrivalUpdates([update]);
     });
 
     return () => {
       s.disconnect();
     };
-  }, [currentUserId]);
+  }, [currentUserId, mergeArrivalUpdates]);
+
+  // Surface push notifications in the Updates list (when sockets were inactive/backgrounded)
+  useEffect(() => {
+    if (isWeb) return;
+
+    const handlePushData = (data: any) => {
+      if (!data || data.type !== "arrival-watch" || !data.targetId) return;
+      const update: ArrivalUpdate = {
+        id: data.watchId ? String(data.watchId) : `${data.targetId}-${Date.now()}`,
+        targetId: String(data.targetId),
+        pinId: data.pinId ? String(data.pinId) : undefined,
+        pinLat: typeof data.pinLat === "number" ? data.pinLat : undefined,
+        pinLng: typeof data.pinLng === "number" ? data.pinLng : undefined,
+        useViewerLocation: !!data.useViewerLocation,
+        eventType: data.eventType === "departure" ? "departure" : "arrival",
+        timestamp: new Date().toISOString(),
+      };
+      mergeArrivalUpdates([update]);
+    };
+
+    const subReceived = Notifications.addNotificationReceivedListener((notification) => {
+      handlePushData(notification?.request?.content?.data);
+    });
+    const subResponse = Notifications.addNotificationResponseReceivedListener((response) => {
+      handlePushData(response?.notification?.request?.content?.data);
+    });
+
+    // Capture a notification that launched the app
+    Notifications.getLastNotificationResponseAsync().then((last) => {
+      if (last) handlePushData(last.notification?.request?.content?.data);
+    });
+
+    return () => {
+      subReceived.remove();
+      subResponse.remove();
+    };
+  }, [isWeb, mergeArrivalUpdates]);
 
   const markers: Marker[] = useMemo(() => {
     const others = followingLocations.map((loc) => ({
@@ -315,6 +352,7 @@ export default function MapScreen() {
   };
 
   const formatLocationLabel = (update: ArrivalUpdate) => {
+    if (update.useViewerLocation) return "near you";
     const pinMatch = pins.find(
       (p) =>
         p.id === update.pinId ||
