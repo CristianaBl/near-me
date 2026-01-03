@@ -369,31 +369,41 @@ export default function Home() {
     const targetId = await ensureUserId();
     if (!targetId) return;
     try {
-      if (enable) {
-        const newSub = await createSubscription(viewerId, targetId);
-        setSubscriptionsFollowers((prev) => {
-          const existing = prev.find((s) => s.viewerId === viewerId && s.targetId === targetId);
-          if (existing) {
-            return prev.map((s) =>
-              s.viewerId === viewerId && s.targetId === targetId ? { ...newSub, canSee: true } : s
-            );
-          }
-          return [...prev, { ...newSub, canSee: true }];
-        });
-      } else {
-        await deleteSubscriptionByUsers(viewerId, targetId);
-        setSubscriptionsFollowers((prev) =>
-          prev.filter((s) => !(s.viewerId === viewerId && s.targetId === targetId))
+      const updated = await setSubscriptionEnabled(viewerId, targetId, enable);
+      setSubscriptionsFollowers((prev) => {
+        const next = { ...updated, canSee: updated.enabled !== false };
+        const existing = prev.find((s) => s.viewerId === viewerId && s.targetId === targetId);
+        if (!existing) return [...prev, next];
+        return prev.map((s) =>
+          s.viewerId === viewerId && s.targetId === targetId ? next : s
         );
-      }
+      });
     } catch (err: any) {
+      if (enable && typeof err?.message === "string" && err.message.toLowerCase().includes("not found")) {
+        try {
+          const newSub = await createSubscription(viewerId, targetId);
+          setSubscriptionsFollowers((prev) => {
+            const next = { ...newSub, canSee: true };
+            const existing = prev.find((s) => s.viewerId === viewerId && s.targetId === targetId);
+            if (!existing) return [...prev, next];
+            return prev.map((s) =>
+              s.viewerId === viewerId && s.targetId === targetId ? next : s
+            );
+          });
+          return;
+        } catch (fallbackErr: any) {
+          Alert.alert("Error", fallbackErr.message || "Could not update access");
+          return;
+        }
+      }
       Alert.alert("Error", err.message || "Could not update access");
     }
   };
 
   const getStatusLabel = (userId: string) => {
     if (subscriptionsFollowing.some((s) => s.targetId === userId)) return "Following";
-    if (subscriptionsFollowers.some((s) => s.viewerId === userId)) return "Can see you";
+    const follower = subscriptionsFollowers.find((s) => s.viewerId === userId);
+    if (follower) return follower.canSee !== false ? "Can see you" : "Follows you";
     if (getPendingRequest(userId)) return "Pending";
     return "Not following";
   };
