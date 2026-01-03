@@ -1,6 +1,5 @@
 // components/MapComponent.web.tsx
 import React, { useEffect, useState } from "react";
-import "leaflet/dist/leaflet.css";
 
 interface Location {
   id: string;
@@ -35,6 +34,18 @@ export default function MapComponent({ locations = [], onMapClick }: MapComponen
     let cancelled = false;
 
     (async () => {
+      if (typeof document !== "undefined") {
+        const href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        const existing = document.querySelector(`link[data-leaflet-css="${href}"]`);
+        if (!existing) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = href;
+          link.setAttribute("data-leaflet-css", href);
+          document.head.appendChild(link);
+        }
+      }
+
       // Load Leaflet + React-Leaflet + CSS only on client
       const leafletModule = await import("leaflet");
       const L = leafletModule.default ?? leafletModule;

@@ -106,6 +106,9 @@ export default function Home() {
         const email = payload?.acceptedByEmail || "Someone";
         Alert.alert("Request accepted", `${email} accepted your follow request`);
       });
+      s.on("follow-request-rejected", async () => {
+        await loadData();
+      });
       setSocket(s);
     };
     setup();
@@ -418,11 +421,13 @@ export default function Home() {
       </TouchableOpacity>
       <View style={styles.rowEnd}>
         <Text style={styles.statusText}>{getStatusLabel(item.id)}</Text>
-        <FancyButton
-          title={getPendingRequest(item.id) ? "Cancel" : "Follow"}
-          onPress={() => handleFollowToggle(item.id)}
-          color={getPendingRequest(item.id) ? "#ffc1dc" : "#ff7eb6"}
-        />
+        {isFollowingUser(item.id) ? null : (
+          <FancyButton
+            title={getPendingRequest(item.id) ? "Cancel" : "Follow"}
+            onPress={() => handleFollowToggle(item.id)}
+            color={getPendingRequest(item.id) ? "#ffc1dc" : "#ff7eb6"}
+          />
+        )}
       </View>
     </View>
   );
